@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ticketing-postgres
+    environment:
+      POSTGRES_USER: ticketuser
+      POSTGRES_PASSWORD: ticketpass
+      POSTGRES_DB: ticketdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  s1-auth-account:
+    build: ../s1-auth-account
+    container_name: s1-auth-account
+    environment:
+      DB_URL: postgres://ticketuser:ticketpass@postgres:5432/ticketdb
+      JWT_SECRET: super-secret-change-me
+      PORT: 3001
+    depends_on:
+      - postgres
+
+  api-gateway:
+    build: ../api-gateway
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      - s1-auth-account
+
+volumes:
+  pgdata:
+
