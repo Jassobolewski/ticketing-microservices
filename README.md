@@ -5,7 +5,7 @@ A small microservice system with an API Gateway, Auth (S1), and Ticket Intake (S
 ---
 
 ## Repo Structure
-
+```
 microserviceProject/
 ├─ api-gateway/ # Single public entrypoint; routes to internal services
 │ ├─ index.js # CORS, /health, proxy routes (/auth, /tickets, ...)
@@ -26,7 +26,7 @@ microserviceProject/
 │ └─ docker-compose.yml # Postgres + services + port mappings
 │
 └─ .gitignore # ignores node_modules, .env, local data, etc.
-
+```
 
 
 
