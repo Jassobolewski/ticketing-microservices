@@ -23,6 +23,17 @@ services:
     depends_on:
       - postgres
 
+  s2-ticket-intake:
+    build: ../s2-ticket-intake
+    container_name: s2-ticket-intake
+    environment:
+      DB_URL: postgres://ticketuser:ticketpass@postgres:5432/ticketdb
+      JWT_SECRET: super-secret-change-me
+      PORT: 3002
+    depends_on:
+      - postgres
+      - s1-auth-account
+
   api-gateway:
     build: ../api-gateway
     container_name: api-gateway
@@ -30,7 +41,7 @@ services:
       - "8080:8080"
     depends_on:
       - s1-auth-account
+      - s2-ticket-intake
 
 volumes:
   pgdata:
-

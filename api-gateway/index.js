@@ -14,7 +14,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// existing proxies...
+// Auth service proxy
 app.use(
   "/auth",
   createProxyMiddleware({
@@ -24,7 +24,15 @@ app.use(
   }),
 );
 
-// add /tickets proxy later, etc.
+// Ticket intake service proxy
+app.use(
+  "/tickets",
+  createProxyMiddleware({
+    target: "http://s2-ticket-intake:3002",
+    changeOrigin: true,
+    pathRewrite: { "^/tickets": "" },
+  }),
+);
 
 app.get("/health", (req, res) => res.json({ status: "ok" }));
 
