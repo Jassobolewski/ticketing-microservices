@@ -54,6 +54,14 @@ async function init() {
   console.log("Tickets table ready");
 }
 
+// Auto-priority mapping based on category
+const CATEGORY_PRIORITY_MAP = {
+  bug: "high",
+  feature: "medium",
+  support: "medium",
+  other: "low",
+};
+
 // POST / - Create a new ticket
 app.post("/", authenticate, async (req, res) => {
   try {
@@ -97,7 +105,7 @@ app.post("/", authenticate, async (req, res) => {
   }
 });
 
-// GET / - List tickets for the authenticated user
+// GET / - List tickets (users see their own, staff see all)
 app.get("/", authenticate, async (req, res) => {
   try {
     const result = await pool.query(
@@ -108,6 +116,7 @@ app.get("/", authenticate, async (req, res) => {
       [req.user.sub],
     );
 
+    const result = await pool.query(query, params);
     res.json({ tickets: result.rows });
   } catch (err) {
     console.error(err);
@@ -115,7 +124,7 @@ app.get("/", authenticate, async (req, res) => {
   }
 });
 
-// GET /:id - Get a specific ticket (only if owned by user)
+// GET /:id - Get a specific ticket
 app.get("/:id", authenticate, async (req, res) => {
   try {
     const ticketId = parseInt(req.params.id);
@@ -214,6 +223,6 @@ const PORT = process.env.PORT || 3002;
 
 init().then(() => {
   app.listen(PORT, () => {
-    console.log(`Ticket Intake service running on port ${PORT}`);
+    console.log(`S2 Ticket Intake service running on port ${PORT}`);
   });
 });
