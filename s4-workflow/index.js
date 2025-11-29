@@ -1,0 +1,374 @@
+const express = require("express");
+const jwt = require("jsonwebtoken");
+const { Pool } = require("pg");
+
+const app = express();
+app.use(express.json());
+
+const pool = new Pool({
+  connectionString: process.env.DB_URL,
+});
+
+const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
+
+// Valid workflow states and priorities
+const VALID_STATUSES = ["new", "assigned", "in_progress", "resolved"];
+const VALID_PRIORITIES = ["low", "medium", "high", "urgent"];
+
+// Status flow validation
+const STATUS_TRANSITIONS = {
+  new: ["assigned"],
+  assigned: ["in_progress"],
+  in_progress: ["resolved"],
+  resolved: [], // Cannot transition from resolved
+};
+
+// Middleware to verify JWT and extract user info
+function authenticate(req, res, next) {
+  try {
+    const auth = req.headers.authorization || "";
+    const [, token] = auth.split(" ");
+    if (!token) {
+      return res.status(401).json({ error: "missing token" });
+    }
+
+    const payload = jwt.verify(token, JWT_SECRET);
+    req.user = payload; // { sub: userId, role, email }
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: "invalid token" });
+  }
+}
+
+// Middleware to check if user is staff or admin
+function requireStaff(req, res, next) {
+  if (req.user.role !== "staff" && req.user.role !== "admin") {
+    return res.status(403).json({ error: "requires staff or admin role" });
+  }
+  next();
+}
+
+// Initialize workflow tables
+async function init() {
+  // Add workflow columns to tickets table if they don't exist
+  try {
+    await pool.query(`
+      ALTER TABLE tickets 
+      ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'medium',
+      ADD COLUMN IF NOT EXISTS assigned_to INTEGER,
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT NOW();
+    `);
+  } catch (err) {
+    console.log("Tickets table columns may already exist or table doesn't exist yet");
+  }
+
+  // Create ticket_history table
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ticket_history (
+      id SERIAL PRIMARY KEY,
+      ticket_id INTEGER NOT NULL,
+      changed_by INTEGER NOT NULL,
+      field_name TEXT NOT NULL,
+      old_value TEXT,
+      new_value TEXT,
+      changed_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  console.log("Workflow tables ready");
+}
+
+// Helper function to log ticket changes
+async function logChange(ticketId, userId, fieldName, oldValue, newValue) {
+  await pool.query(
+    `INSERT INTO ticket_history (ticket_id, changed_by, field_name, old_value, new_value)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [ticketId, userId, fieldName, oldValue, newValue]
+  );
+}
+
+// PATCH /priority/:id - Update ticket priority (staff only)
+app.patch("/priority/:id", authenticate, requireStaff, async (req, res) => {
+  try {
+    const ticketId = parseInt(req.params.id);
+    const { priority } = req.body;
+
+    if (isNaN(ticketId)) {
+      return res.status(400).json({ error: "invalid ticket id" });
+    }
+
+    if (!priority || !VALID_PRIORITIES.includes(priority.toLowerCase())) {
+      return res.status(400).json({
+        error: `priority must be one of: ${VALID_PRIORITIES.join(", ")}`,
+      });
+    }
+
+    // Get current ticket
+    const current = await pool.query(
+      "SELECT priority FROM tickets WHERE id = $1",
+      [ticketId]
+    );
+
+    if (current.rows.length === 0) {
+      return res.status(404).json({ error: "ticket not found" });
+    }
+
+    const oldPriority = current.rows[0].priority;
+
+    // Update priority
+    const result = await pool.query(
+      `UPDATE tickets 
+       SET priority = $1, updated_at = NOW() 
+       WHERE id = $2 
+       RETURNING id, user_id, title, description, category, status, priority, assigned_to, created_at`,
+      [priority.toLowerCase(), ticketId]
+    );
+
+    // Log the change
+    await logChange(
+      ticketId,
+      req.user.sub,
+      "priority",
+      oldPriority,
+      priority.toLowerCase()
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "internal error" });
+  }
+});
+
+// PATCH /status/:id - Update ticket status with workflow validation (staff only)
+app.patch("/status/:id", authenticate, requireStaff, async (req, res) => {
+  try {
+    const ticketId = parseInt(req.params.id);
+    const { status } = req.body;
+
+    if (isNaN(ticketId)) {
+      return res.status(400).json({ error: "invalid ticket id" });
+    }
+
+    if (!status || !VALID_STATUSES.includes(status.toLowerCase())) {
+      return res.status(400).json({
+        error: `status must be one of: ${VALID_STATUSES.join(", ")}`,
+      });
+    }
+
+    // Get current ticket
+    const current = await pool.query(
+      "SELECT status FROM tickets WHERE id = $1",
+      [ticketId]
+    );
+
+    if (current.rows.length === 0) {
+      return res.status(404).json({ error: "ticket not found" });
+    }
+
+    const currentStatus = current.rows[0].status;
+    const newStatus = status.toLowerCase();
+
+    // Validate status transition
+    const allowedTransitions = STATUS_TRANSITIONS[currentStatus] || [];
+    if (!allowedTransitions.includes(newStatus)) {
+      return res.status(400).json({
+        error: `cannot transition from ${currentStatus} to ${newStatus}. Allowed: ${
+          allowedTransitions.join(", ") || "none"
+        }`,
+      });
+    }
+
+    // Update status
+    const result = await pool.query(
+      `UPDATE tickets 
+       SET status = $1, updated_at = NOW() 
+       WHERE id = $2 
+       RETURNING id, user_id, title, description, category, status, priority, assigned_to, created_at`,
+      [newStatus, ticketId]
+    );
+
+    // Log the change
+    await logChange(ticketId, req.user.sub, "status", currentStatus, newStatus);
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "internal error" });
+  }
+});
+
+// PATCH /assign/:id - Assign ticket to staff member (staff only)
+app.patch("/assign/:id", authenticate, requireStaff, async (req, res) => {
+  try {
+    const ticketId = parseInt(req.params.id);
+    const { assigned_to } = req.body;
+
+    if (isNaN(ticketId)) {
+      return res.status(400).json({ error: "invalid ticket id" });
+    }
+
+    // Get current ticket
+    const current = await pool.query(
+      "SELECT status, assigned_to FROM tickets WHERE id = $1",
+      [ticketId]
+    );
+
+    if (current.rows.length === 0) {
+      return res.status(404).json({ error: "ticket not found" });
+    }
+
+    const oldAssignedTo = current.rows[0].assigned_to;
+    const currentStatus = current.rows[0].status;
+
+    // Auto-update status to 'assigned' if currently 'new'
+    let newStatus = currentStatus;
+    if (currentStatus === "new" && assigned_to) {
+      newStatus = "assigned";
+    }
+
+    // Update assignment and status
+    const result = await pool.query(
+      `UPDATE tickets 
+       SET assigned_to = $1, status = $2, updated_at = NOW() 
+       WHERE id = $3 
+       RETURNING id, user_id, title, description, category, status, priority, assigned_to, created_at`,
+      [assigned_to || null, newStatus, ticketId]
+    );
+
+    // Log the changes
+    await logChange(
+      ticketId,
+      req.user.sub,
+      "assigned_to",
+      oldAssignedTo ? oldAssignedTo.toString() : null,
+      assigned_to ? assigned_to.toString() : null
+    );
+
+    if (newStatus !== currentStatus) {
+      await logChange(
+        ticketId,
+        req.user.sub,
+        "status",
+        currentStatus,
+        newStatus
+      );
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "internal error" });
+  }
+});
+
+// GET /history/:id - Get ticket change history
+app.get("/history/:id", authenticate, async (req, res) => {
+  try {
+    const ticketId = parseInt(req.params.id);
+
+    if (isNaN(ticketId)) {
+      return res.status(400).json({ error: "invalid ticket id" });
+    }
+
+    // Check if user has access to this ticket
+    let accessCheck;
+    if (req.user.role === "staff" || req.user.role === "admin") {
+      accessCheck = await pool.query("SELECT id FROM tickets WHERE id = $1", [
+        ticketId,
+      ]);
+    } else {
+      accessCheck = await pool.query(
+        "SELECT id FROM tickets WHERE id = $1 AND user_id = $2",
+        [ticketId, req.user.sub]
+      );
+    }
+
+    if (accessCheck.rows.length === 0) {
+      return res.status(404).json({ error: "ticket not found" });
+    }
+
+    // Get history
+    const result = await pool.query(
+      `SELECT id, ticket_id, changed_by, field_name, old_value, new_value, changed_at 
+       FROM ticket_history 
+       WHERE ticket_id = $1 
+       ORDER BY changed_at DESC`,
+      [ticketId]
+    );
+
+    res.json({ history: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "internal error" });
+  }
+});
+
+// GET /queue - Get prioritized ticket queue for staff (staff only)
+app.get("/queue", authenticate, requireStaff, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id, user_id, title, description, category, status, priority, assigned_to, created_at 
+      FROM tickets 
+      WHERE status != 'resolved'
+      ORDER BY 
+        CASE priority 
+          WHEN 'urgent' THEN 1 
+          WHEN 'high' THEN 2 
+          WHEN 'medium' THEN 3 
+          WHEN 'low' THEN 4 
+        END,
+        created_at ASC
+    `);
+
+    res.json({ queue: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "internal error" });
+  }
+});
+
+// POST /auto-priority/:id - Auto-assign priority based on category (internal use)
+app.post("/auto-priority/:id", authenticate, async (req, res) => {
+  try {
+    const ticketId = parseInt(req.params.id);
+    const { category } = req.body;
+
+    if (isNaN(ticketId)) {
+      return res.status(400).json({ error: "invalid ticket id" });
+    }
+
+    // Auto-priority mapping
+    const CATEGORY_PRIORITY_MAP = {
+      bug: "high",
+      feature: "medium",
+      support: "medium",
+      other: "low",
+    };
+
+    const priority = CATEGORY_PRIORITY_MAP[category] || "medium";
+
+    // Update priority
+    await pool.query(
+      `UPDATE tickets 
+       SET priority = $1, updated_at = NOW() 
+       WHERE id = $2`,
+      [priority, ticketId]
+    );
+
+    res.json({ ticketId, priority });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "internal error" });
+  }
+});
+
+app.get("/health", (req, res) => res.json({ status: "ok" }));
+
+const PORT = process.env.PORT || 3004;
+
+init().then(() => {
+  app.listen(PORT, () => {
+    console.log(`S4 Workflow service running on port ${PORT}`);
+  });
+});
