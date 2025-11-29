@@ -19,6 +19,7 @@
     let title = "";
     let description = "";
     let category = "bug";
+    let priority = "medium";
     let ticketError = "";
     let ticketSuccess = "";
 
@@ -121,7 +122,7 @@
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify({ title, description, category }),
+                body: JSON.stringify({ title, description, category, priority }),
             });
 
             const data = await response.json();
@@ -135,6 +136,7 @@
             title = "";
             description = "";
             category = "bug";
+            priority = "medium";
 
             await fetchTickets();
             setTimeout(() => {
@@ -142,6 +144,50 @@
             }, 3000);
         } catch (err) {
             ticketError = "Network error: " + err.message;
+        }
+    }
+
+    // Update ticket priority - FIX FOR JSON PARSE ERROR
+    async function updateTicketPriority(ticketId, newPriority) {
+        try {
+            const response = await fetch(`${API_URL}/tickets/${ticketId}`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ priority: newPriority }),
+            });
+
+            // Check if response is ok before parsing
+            if (!response.ok) {
+                // Try to parse error message
+                try {
+                    const errorData = await response.json();
+                    console.error("Update failed:", errorData.error);
+                } catch {
+                    console.error("Update failed with status:", response.status);
+                }
+                return;
+            }
+
+            // CRITICAL FIX: Check if response has content before parsing
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.includes("application/json")) {
+                const updatedTicket = await response.json();
+
+                // Update the ticket in the local array
+                tickets = tickets.map((t) =>
+                    t.id === ticketId ? updatedTicket : t
+                );
+            } else {
+                // If no JSON returned, just refresh the list
+                await fetchTickets();
+            }
+        } catch (err) {
+            console.error("Error updating priority:", err);
+            // Fallback: refresh the list to show updated data
+            await fetchTickets();
         }
     }
 
@@ -441,6 +487,16 @@
                         </select>
                     </div>
 
+                    <div class="form-group">
+                        <label for="priority">Priority</label>
+                        <select id="priority" bind:value={priority}>
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                            <option value="urgent">Urgent</option>
+                        </select>
+                    </div>
+
                     {#if ticketError}
                         <div class="error">{ticketError}</div>
                     {/if}
@@ -491,6 +547,28 @@
                                 <p class="ticket-description">
                                     {ticket.description}
                                 </p>
+                                <div class="ticket-meta">
+                                    <div class="ticket-priority-selector">
+                                        <label for="priority-{ticket.id}"
+                                            >Priority:</label
+                                        >
+                                        <select
+                                            id="priority-{ticket.id}"
+                                            value={ticket.priority}
+                                            on:change={(e) =>
+                                                updateTicketPriority(
+                                                    ticket.id,
+                                                    e.target.value,
+                                                )}
+                                            class="priority-select priority-{ticket.priority}"
+                                        >
+                                            <option value="low">Low</option>
+                                            <option value="medium">Medium</option>
+                                            <option value="high">High</option>
+                                            <option value="urgent">Urgent</option>
+                                        </select>
+                                    </div>
+                                </div>
                                 <div class="ticket-footer">
                                     <span
                                         class="ticket-status"
@@ -979,171 +1057,79 @@
         text-transform: capitalize;
     }
 
+    /* Priority Selector */
     .ticket-meta {
-        color: #666;
+        margin-bottom: 1rem;
     }
 
-    .ticket-date {
-        color: #999;
-    }
-
-    /* Modal Styles */
-    .modal-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
+    .ticket-priority-selector {
         display: flex;
         align-items: center;
-        justify-content: center;
-        z-index: 1000;
-        padding: 1rem;
-    }
-
-    .modal {
-        background: white;
-        border-radius: 12px;
-        max-width: 800px;
-        width: 100%;
-        max-height: 90vh;
-        overflow-y: auto;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    }
-
-    .modal-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: start;
-        padding: 2rem;
-        border-bottom: 2px solid #e0e0e0;
-    }
-
-    .modal-header h2 {
-        margin: 0;
-        color: #333;
-    }
-
-    .close-btn {
-        background: none;
-        border: none;
-        font-size: 1.5rem;
-        color: #999;
-        cursor: pointer;
-        padding: 0;
-        width: 32px;
-        height: 32px;
-    }
-
-    .close-btn:hover {
-        color: #333;
-    }
-
-    .modal-body {
-        padding: 2rem;
-    }
-
-    .ticket-details {
-        margin-bottom: 2rem;
-    }
-
-    .detail-row {
-        display: flex;
-        gap: 1rem;
-        margin-bottom: 1rem;
-        align-items: baseline;
-    }
-
-    .detail-row strong {
-        min-width: 120px;
-        color: #666;
-    }
-
-    .detail-row p {
-        margin: 0;
-        flex: 1;
-    }
-
-    .workflow-controls {
-        background: #f9fafb;
-        border-radius: 8px;
-        padding: 1.5rem;
-        margin-bottom: 2rem;
-    }
-
-    .control-group {
-        margin-bottom: 1.5rem;
-    }
-
-    .control-group:last-child {
-        margin-bottom: 0;
-    }
-
-    .control-group label {
-        display: block;
-        margin-bottom: 0.75rem;
-        font-weight: 600;
-        color: #333;
-    }
-
-    .button-group {
-        display: flex;
         gap: 0.5rem;
-        flex-wrap: wrap;
     }
 
-    .button-group button {
-        flex: 0 0 auto;
-        padding: 0.5rem 1rem;
-        background: #667eea;
-        color: white;
+    .ticket-priority-selector label {
         font-size: 0.875rem;
-    }
-
-    .button-group button:hover {
-        background: #5568d3;
-    }
-
-    .info {
+        font-weight: 600;
         color: #666;
-        font-style: italic;
+        margin: 0;
     }
 
-    .ticket-history {
-        background: #f9fafb;
-        border-radius: 8px;
-        padding: 1.5rem;
-    }
-
-    .no-history {
-        color: #999;
-        text-align: center;
-        padding: 1rem;
-    }
-
-    .history-list {
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-    }
-
-    .history-item {
-        background: white;
-        border-left: 4px solid #667eea;
-        padding: 1rem;
-        border-radius: 4px;
-    }
-
-    .history-item code {
-        background: #f3f4f6;
-        padding: 0.125rem 0.375rem;
-        border-radius: 4px;
-        font-family: "Courier New", monospace;
+    .priority-select {
+        padding: 0.5rem 0.75rem;
+        border-radius: 6px;
+        border: 2px solid;
+        font-weight: 600;
         font-size: 0.875rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-transform: capitalize;
     }
 
-    .history-item small {
-        color: #999;
+    .priority-select:focus {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+    }
+
+    /* Priority color coding */
+    .priority-low {
+        background: #e8f5e9;
+        border-color: #4caf50;
+        color: #2e7d32;
+    }
+
+    .priority-medium {
+        background: #fff3e0;
+        border-color: #ff9800;
+        color: #e65100;
+    }
+
+    .priority-high {
+        background: #ffe0e0;
+        border-color: #f44336;
+        color: #c62828;
+    }
+
+    .priority-urgent {
+        background: #f3e5f5;
+        border-color: #9c27b0;
+        color: #6a1b9a;
+        font-weight: 700;
+    }
+
+    .priority-low:hover {
+        background: #c8e6c9;
+    }
+
+    .priority-medium:hover {
+        background: #ffe0b2;
+    }
+
+    .priority-high:hover {
+        background: #ffcdd2;
+    }
+
+    .priority-urgent:hover {
+        background: #e1bee7;
     }
 </style>

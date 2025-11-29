@@ -39,11 +39,18 @@ async function init() {
       category TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'new',
       priority TEXT NOT NULL DEFAULT 'medium',
-      assigned_to INTEGER,
-      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
   `);
+
+  // Add priority column if it doesn't exist (for existing databases)
+  await pool.query(`
+    ALTER TABLE tickets
+    ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'medium';
+  `).catch(() => {
+    // Column might already exist, ignore error
+  });
+
   console.log("Tickets table ready");
 }
 
@@ -58,7 +65,7 @@ const CATEGORY_PRIORITY_MAP = {
 // POST / - Create a new ticket
 app.post("/", authenticate, async (req, res) => {
   try {
-    const { title, description, category } = req.body;
+    const { title, description, category, priority } = req.body;
 
     // Validate required fields
     if (!title || !description || !category) {
@@ -75,14 +82,20 @@ app.post("/", authenticate, async (req, res) => {
       });
     }
 
-    // Auto-assign priority based on category
-    const priority = CATEGORY_PRIORITY_MAP[category.toLowerCase()];
+    // Validate priority if provided
+    const validPriorities = ["low", "medium", "high", "urgent"];
+    const ticketPriority = priority ? priority.toLowerCase() : "medium";
+    if (!validPriorities.includes(ticketPriority)) {
+      return res.status(400).json({
+        error: `priority must be one of: ${validPriorities.join(", ")}`,
+      });
+    }
 
     const result = await pool.query(
       `INSERT INTO tickets (user_id, title, description, category, priority)
        VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, user_id, title, description, category, status, priority, assigned_to, created_at`,
-      [req.user.sub, title, description, category.toLowerCase(), priority],
+       RETURNING id, user_id, title, description, category, status, priority, created_at`,
+      [req.user.sub, title, description, category.toLowerCase(), ticketPriority],
     );
 
     res.status(201).json(result.rows[0]);
@@ -95,34 +108,13 @@ app.post("/", authenticate, async (req, res) => {
 // GET / - List tickets (users see their own, staff see all)
 app.get("/", authenticate, async (req, res) => {
   try {
-    let query;
-    let params;
-
-    if (req.user.role === "staff" || req.user.role === "admin") {
-      // Staff/admin can see all tickets, sorted by priority
-      query = `
-        SELECT id, user_id, title, description, category, status, priority, assigned_to, created_at
-        FROM tickets
-        ORDER BY
-          CASE priority
-            WHEN 'urgent' THEN 1
-            WHEN 'high' THEN 2
-            WHEN 'medium' THEN 3
-            WHEN 'low' THEN 4
-          END,
-          created_at DESC
-      `;
-      params = [];
-    } else {
-      // Regular users only see their own tickets
-      query = `
-        SELECT id, user_id, title, description, category, status, priority, assigned_to, created_at
-        FROM tickets
-        WHERE user_id = $1
-        ORDER BY created_at DESC
-      `;
-      params = [req.user.sub];
-    }
+    const result = await pool.query(
+      `SELECT id, user_id, title, description, category, status, priority, created_at
+       FROM tickets
+       WHERE user_id = $1
+       ORDER BY created_at DESC`,
+      [req.user.sub],
+    );
 
     const result = await pool.query(query, params);
     res.json({ tickets: result.rows });
@@ -141,28 +133,12 @@ app.get("/:id", authenticate, async (req, res) => {
       return res.status(400).json({ error: "invalid ticket id" });
     }
 
-    let query;
-    let params;
-
-    if (req.user.role === "staff" || req.user.role === "admin") {
-      // Staff can see any ticket
-      query = `
-        SELECT id, user_id, title, description, category, status, priority, assigned_to, created_at
-        FROM tickets
-        WHERE id = $1
-      `;
-      params = [ticketId];
-    } else {
-      // Users can only see their own tickets
-      query = `
-        SELECT id, user_id, title, description, category, status, priority, assigned_to, created_at
-        FROM tickets
-        WHERE id = $1 AND user_id = $2
-      `;
-      params = [ticketId, req.user.sub];
-    }
-
-    const result = await pool.query(query, params);
+    const result = await pool.query(
+      `SELECT id, user_id, title, description, category, status, priority, created_at
+       FROM tickets
+       WHERE id = $1 AND user_id = $2`,
+      [ticketId, req.user.sub],
+    );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "ticket not found" });
@@ -175,7 +151,73 @@ app.get("/:id", authenticate, async (req, res) => {
   }
 });
 
-app.get("/health", (req, res) => res.json({ status: "ok" }));
+// PATCH /:id - Update ticket (status, priority, etc.) - MUST RETURN JSON
+app.patch("/:id", authenticate, async (req, res) => {
+  try {
+    const ticketId = parseInt(req.params.id);
+
+    if (isNaN(ticketId)) {
+      return res.status(400).json({ error: "invalid ticket id" });
+    }
+
+    const { status, priority } = req.body;
+
+    // Validate that at least one field is provided
+    if (!status && !priority) {
+      return res.status(400).json({
+        error: "at least one field (status or priority) is required",
+      });
+    }
+
+    // Validate priority if provided
+    if (priority) {
+      const validPriorities = ["low", "medium", "high", "urgent"];
+      if (!validPriorities.includes(priority.toLowerCase())) {
+        return res.status(400).json({
+          error: `priority must be one of: ${validPriorities.join(", ")}`,
+        });
+      }
+    }
+
+    // Build dynamic UPDATE query based on provided fields
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (status) {
+      updates.push(`status = $${paramCount}`);
+      values.push(status.toLowerCase());
+      paramCount++;
+    }
+
+    if (priority) {
+      updates.push(`priority = $${paramCount}`);
+      values.push(priority.toLowerCase());
+      paramCount++;
+    }
+
+    // Add ticket ID and user ID to values
+    values.push(ticketId, req.user.sub);
+
+    const result = await pool.query(
+      `UPDATE tickets
+       SET ${updates.join(", ")}
+       WHERE id = $${paramCount} AND user_id = $${paramCount + 1}
+       RETURNING id, user_id, title, description, category, status, priority, created_at`,
+      values,
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "ticket not found" });
+    }
+
+    // CRITICAL: Always return JSON response
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "internal error" });
+  }
+});
 
 const PORT = process.env.PORT || 3002;
 
