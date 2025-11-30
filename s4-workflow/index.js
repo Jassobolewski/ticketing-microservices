@@ -363,12 +363,16 @@ app.post("/auto-priority/:id", authenticate, async (req, res) => {
   }
 });
 
-app.get("/health", (req, res) => res.json({ status: "ok" }));
+app.get("/health", (req, res) => res.json({ status: "ok", service: "s4-workflow" }));
 
 const PORT = process.env.PORT || 3004;
+const registerService = require('./register-helper');
 
 init().then(() => {
-  app.listen(PORT, () => {
+  app.listen(PORT, async () => {
     console.log(`S4 Workflow service running on port ${PORT}`);
+
+    // Register with service registry
+    await registerService('s4-workflow', 's4-workflow', PORT, '/health');
   });
 });

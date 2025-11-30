@@ -251,10 +251,19 @@ app.patch("/:id", authenticate, async (req, res) => {
   }
 });
 
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", service: "s2-tickets" });
+});
+
 const PORT = process.env.PORT || 3002;
+const registerService = require('./register-helper');
 
 init().then(() => {
-  app.listen(PORT, () => {
+  app.listen(PORT, async () => {
     console.log(`S2 Ticket Intake service running on port ${PORT}`);
+
+    // Register with service registry
+    await registerService('s2-tickets', 's2-ticket-intake', PORT, '/health');
   });
 });
