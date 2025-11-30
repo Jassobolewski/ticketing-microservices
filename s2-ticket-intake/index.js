@@ -108,13 +108,23 @@ app.post("/", authenticate, async (req, res) => {
 // GET / - List tickets (users see their own, staff see all)
 app.get("/", authenticate, async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT id, user_id, title, description, category, status, priority, created_at
-       FROM tickets
-       WHERE user_id = $1
-       ORDER BY created_at DESC`,
-      [req.user.sub],
-    );
+    // Staff/Admin can see all tickets, regular users only see their own
+    const isStaff = req.user.role === "staff" || req.user.role === "admin";
+
+    let query, params;
+
+    if (isStaff) {
+      query = `SELECT id, user_id, title, description, category, status, priority, created_at
+               FROM tickets
+               ORDER BY created_at DESC`;
+      params = [];
+    } else {
+      query = `SELECT id, user_id, title, description, category, status, priority, created_at
+               FROM tickets
+               WHERE user_id = $1
+               ORDER BY created_at DESC`;
+      params = [req.user.sub];
+    }
 
     const result = await pool.query(query, params);
     res.json({ tickets: result.rows });
@@ -124,7 +134,7 @@ app.get("/", authenticate, async (req, res) => {
   }
 });
 
-// GET /:id - Get a specific ticket
+// GET /:id - Get a specific ticket (staff can view any, users only their own)
 app.get("/:id", authenticate, async (req, res) => {
   try {
     const ticketId = parseInt(req.params.id);
@@ -133,12 +143,24 @@ app.get("/:id", authenticate, async (req, res) => {
       return res.status(400).json({ error: "invalid ticket id" });
     }
 
-    const result = await pool.query(
-      `SELECT id, user_id, title, description, category, status, priority, created_at
-       FROM tickets
-       WHERE id = $1 AND user_id = $2`,
-      [ticketId, req.user.sub],
-    );
+    // Staff/Admin can view any ticket, regular users only their own
+    const isStaff = req.user.role === "staff" || req.user.role === "admin";
+
+    let query, params;
+
+    if (isStaff) {
+      query = `SELECT id, user_id, title, description, category, status, priority, created_at
+               FROM tickets
+               WHERE id = $1`;
+      params = [ticketId];
+    } else {
+      query = `SELECT id, user_id, title, description, category, status, priority, created_at
+               FROM tickets
+               WHERE id = $1 AND user_id = $2`;
+      params = [ticketId, req.user.sub];
+    }
+
+    const result = await pool.query(query, params);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "ticket not found" });
