@@ -10,7 +10,7 @@ const REGISTRY_URL = process.env.REGISTRY_URL || "http://s3-registry:3003";
 const serviceCache = new Map();
 const CACHE_TTL = 30000; // 30 seconds
 
-// CORS (dev-simple)
+// CORS (dev-simple) - MUST handle OPTIONS before proxy middleware
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "http://localhost:5173");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -18,7 +18,10 @@ app.use((req, res, next) => {
     "Access-Control-Allow-Methods",
     "GET,POST,PUT,PATCH,DELETE,OPTIONS",
   );
-  if (req.method === "OPTIONS") return res.sendStatus(200);
+  // Handle OPTIONS preflight requests immediately
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
   next();
 });
 
