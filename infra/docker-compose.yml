@@ -41,6 +41,8 @@ services:
       JWT_SECRET: super-secret-change-me
       PORT: 3002
       REGISTRY_URL: http://s3-registry:3003
+    ports:
+      - "3002:3002"
     depends_on:
       - postgres
       - s3-registry
@@ -60,6 +62,72 @@ services:
       - s1-auth-account
       - s2-ticket-intake
 
+  s5-media:
+    build: ../s5-media
+    container_name: s5-media
+    environment:
+      DB_URL: postgres://ticketuser:ticketpass@postgres:5432/ticketdb
+      JWT_SECRET: super-secret-change-me
+      PORT: 3005
+      REGISTRY_URL: http://s3-registry:3003
+      UPLOAD_DIR: /app/uploads
+    ports:
+      - "3005:3005"
+    volumes:
+      - media-uploads:/app/uploads
+    depends_on:
+      - postgres
+      - s3-registry
+      - s1-auth-account
+
+  s6-notifications:
+    build: ../s6-notifications
+    container_name: s6-notifications
+    environment:
+      DB_URL: postgres://ticketuser:ticketpass@postgres:5432/ticketdb
+      JWT_SECRET: super-secret-change-me
+      PORT: 3006
+      REGISTRY_URL: http://s3-registry:3003
+    ports:
+      - "3006:3006"
+    depends_on:
+      - postgres
+      - s3-registry
+      - s1-auth-account
+
+  s7-analytics:
+    build: ../s7-analytics
+    container_name: s7-analytics
+    environment:
+      DB_URL: postgres://ticketuser:ticketpass@postgres:5432/ticketdb
+      JWT_SECRET: super-secret-change-me
+      PORT: 3007
+      REGISTRY_URL: http://s3-registry:3003
+    ports:
+      - "3007:3007"
+    depends_on:
+      - postgres
+      - s3-registry
+      - s1-auth-account
+      - s2-ticket-intake
+
+  s8-feedback:
+    build: ../s8-feedback
+    container_name: s8-feedback
+    environment:
+      DB_URL: postgres://ticketuser:ticketpass@postgres:5432/ticketdb
+      JWT_SECRET: super-secret-change-me
+      PORT: 3008
+      REGISTRY_URL: http://s3-registry:3003
+    ports:
+      - "3008:3008"
+    depends_on:
+      - postgres
+      - s3-registry
+      - s1-auth-account
+      - s2-ticket-intake
+      - s7-analytics
+
   api-gateway:
     build: ../api-gateway
     container_name: api-gateway
@@ -72,6 +140,11 @@ services:
       - s1-auth-account
       - s2-ticket-intake
       - s4-workflow
+      - s5-media
+      - s6-notifications
+      - s7-analytics
+      - s8-feedback
 
 volumes:
   pgdata:
+  media-uploads:

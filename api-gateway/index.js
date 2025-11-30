@@ -61,6 +61,10 @@ async function discoverService(serviceName) {
       "s1-auth": "http://s1-auth-account:3001",
       "s2-tickets": "http://s2-ticket-intake:3002",
       "s4-workflow": "http://s4-workflow:3004",
+      "s5-media": "http://s5-media:3005",
+      "s6-notifications": "http://s6-notifications:3006",
+      "s7-analytics": "http://s7-analytics:3007",
+      "s8-feedback": "http://s8-feedback:3008",
     };
 
     if (fallbackUrls[serviceName]) {
@@ -115,6 +119,10 @@ function createDynamicProxy(serviceName, pathPrefix) {
 app.use("/auth", createDynamicProxy("s1-auth", "/auth"));
 app.use("/tickets", createDynamicProxy("s2-tickets", "/tickets"));
 app.use("/workflow", createDynamicProxy("s4-workflow", "/workflow"));
+app.use("/media", createDynamicProxy("s5-media", "/media"));
+app.use("/notifications", createDynamicProxy("s6-notifications", "/notifications"));
+app.use("/analytics", createDynamicProxy("s7-analytics", "/analytics"));
+app.use("/feedback", createDynamicProxy("s8-feedback", "/feedback"));
 
 // Endpoint to list all available services (for debugging)
 app.get("/registry/services", async (req, res) => {
