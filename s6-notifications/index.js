@@ -22,6 +22,7 @@ const NOTIFICATION_TYPES = {
   TICKET_ASSIGNED: "ticket_assigned",
   TICKET_STATUS_CHANGED: "ticket_status_changed",
   TICKET_CLOSED: "ticket_closed",
+  TEST_ALERT: "test_alert",
 };
 
 // Notification channels
@@ -214,8 +215,7 @@ app.get("/health", (req, res) => {
 // POST /notify - Send a notification
 app.post("/notify", authenticate, async (req, res) => {
   try {
-    const { user_id, ticket_id, type, channel, message, user_email } =
-      req.body;
+    const { user_id, ticket_id, type, channel, message, user_email } = req.body;
 
     // Validate required fields
     if (!user_id || !type || !channel || !message) {
@@ -341,6 +341,11 @@ init().then(() => {
     processQueue();
 
     // Register with service registry
-    await registerService("s6-notifications", "s6-notifications", PORT, "/health");
+    await registerService(
+      "s6-notifications",
+      "s6-notifications",
+      PORT,
+      "/health",
+    );
   });
 });
