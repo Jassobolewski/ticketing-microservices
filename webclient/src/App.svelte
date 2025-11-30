@@ -147,49 +147,7 @@
         }
     }
 
-    // Update ticket priority - FIX FOR JSON PARSE ERROR
-    async function updateTicketPriority(ticketId, newPriority) {
-        try {
-            const response = await fetch(`${API_URL}/tickets/${ticketId}`, {
-                method: "PATCH",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({ priority: newPriority }),
-            });
-
-            // Check if response is ok before parsing
-            if (!response.ok) {
-                // Try to parse error message
-                try {
-                    const errorData = await response.json();
-                    console.error("Update failed:", errorData.error);
-                } catch {
-                    console.error("Update failed with status:", response.status);
-                }
-                return;
-            }
-
-            // CRITICAL FIX: Check if response has content before parsing
-            const contentType = response.headers.get("content-type");
-            if (contentType && contentType.includes("application/json")) {
-                const updatedTicket = await response.json();
-
-                // Update the ticket in the local array
-                tickets = tickets.map((t) =>
-                    t.id === ticketId ? updatedTicket : t
-                );
-            } else {
-                // If no JSON returned, just refresh the list
-                await fetchTickets();
-            }
-        } catch (err) {
-            console.error("Error updating priority:", err);
-            // Fallback: refresh the list to show updated data
-            await fetchTickets();
-        }
-    }
+    // REMOVED: Duplicate function - using workflow version below instead
 
     async function fetchTickets() {
         try {
@@ -245,20 +203,41 @@
                 },
             );
 
-            const data = await response.json();
-
+            // FIX: Check if response is ok before parsing
             if (!response.ok) {
-                workflowError = data.error || "Failed to update priority";
+                // Try to parse error message if JSON available
+                try {
+                    const contentType = response.headers.get("content-type");
+                    if (contentType && contentType.includes("application/json")) {
+                        const errorData = await response.json();
+                        workflowError = errorData.error || "Failed to update priority";
+                    } else {
+                        workflowError = `Failed to update priority (${response.status})`;
+                    }
+                } catch {
+                    workflowError = `Failed to update priority (${response.status})`;
+                }
                 return;
+            }
+
+            // FIX: Check if response has JSON content before parsing
+            const contentType = response.headers.get("content-type");
+            let data = null;
+
+            if (contentType && contentType.includes("application/json")) {
+                data = await response.json();
             }
 
             await fetchTickets();
             if (selectedTicket && selectedTicket.id === ticketId) {
-                selectedTicket = data;
+                selectedTicket = data || selectedTicket;
                 await fetchTicketHistory(ticketId);
             }
         } catch (err) {
+            console.error("Error updating priority:", err);
             workflowError = "Network error: " + err.message;
+            // Fallback: refresh tickets to show any updates
+            await fetchTickets();
         }
     }
 
@@ -277,20 +256,39 @@
                 },
             );
 
-            const data = await response.json();
-
+            // FIX: Check if response is ok before parsing
             if (!response.ok) {
-                workflowError = data.error || "Failed to update status";
+                try {
+                    const contentType = response.headers.get("content-type");
+                    if (contentType && contentType.includes("application/json")) {
+                        const errorData = await response.json();
+                        workflowError = errorData.error || "Failed to update status";
+                    } else {
+                        workflowError = `Failed to update status (${response.status})`;
+                    }
+                } catch {
+                    workflowError = `Failed to update status (${response.status})`;
+                }
                 return;
+            }
+
+            // FIX: Check if response has JSON content before parsing
+            const contentType = response.headers.get("content-type");
+            let data = null;
+
+            if (contentType && contentType.includes("application/json")) {
+                data = await response.json();
             }
 
             await fetchTickets();
             if (selectedTicket && selectedTicket.id === ticketId) {
-                selectedTicket = data;
+                selectedTicket = data || selectedTicket;
                 await fetchTicketHistory(ticketId);
             }
         } catch (err) {
+            console.error("Error updating status:", err);
             workflowError = "Network error: " + err.message;
+            await fetchTickets();
         }
     }
 
@@ -309,20 +307,39 @@
                 },
             );
 
-            const data = await response.json();
-
+            // FIX: Check if response is ok before parsing
             if (!response.ok) {
-                workflowError = data.error || "Failed to assign ticket";
+                try {
+                    const contentType = response.headers.get("content-type");
+                    if (contentType && contentType.includes("application/json")) {
+                        const errorData = await response.json();
+                        workflowError = errorData.error || "Failed to assign ticket";
+                    } else {
+                        workflowError = `Failed to assign ticket (${response.status})`;
+                    }
+                } catch {
+                    workflowError = `Failed to assign ticket (${response.status})`;
+                }
                 return;
+            }
+
+            // FIX: Check if response has JSON content before parsing
+            const contentType = response.headers.get("content-type");
+            let data = null;
+
+            if (contentType && contentType.includes("application/json")) {
+                data = await response.json();
             }
 
             await fetchTickets();
             if (selectedTicket && selectedTicket.id === ticketId) {
-                selectedTicket = data;
+                selectedTicket = data || selectedTicket;
                 await fetchTicketHistory(ticketId);
             }
         } catch (err) {
+            console.error("Error assigning ticket:", err);
             workflowError = "Network error: " + err.message;
+            await fetchTickets();
         }
     }
 
