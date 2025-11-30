@@ -136,7 +136,7 @@ app.get("/", authenticate, async (req, res) => {
       params = [req.user.sub];
     }
 
-    result = await pool.query(query, params);
+    const result = await pool.query(query, params);
     res.json({ tickets: result.rows });
   } catch (err) {
     console.error(err);
