@@ -52,6 +52,37 @@
         }
     });
 
+    // Add this inside <script>
+    async function sendTestNotification() {
+        if (!user) return;
+
+        try {
+            // NOTE: The API Gateway routes /notifications/* to the s6 service
+            const response = await fetch(`${API_URL}/notifications/notify`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    user_id: user.sub,
+                    type: "test_alert",
+                    channel: "in_app", // Change to 'email' to see server logs
+                    message: `This is a test notification at ${new Date().toLocaleTimeString()}`,
+                    ticket_id: null,
+                }),
+            });
+
+            if (response.ok) {
+                alert("Notification sent! Check the Notifications tab.");
+                await fetchNotifications(); // Refresh the list
+            } else {
+                alert("Failed to send notification");
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    }
     // Auth functions
     async function handleAuth() {
         authError = "";
@@ -957,7 +988,18 @@
             {:else if activeTab === "notifications"}
                 <div class="notifications-panel">
                     <h2>🔔 Notification History</h2>
-
+                    <div
+                        class="notifications-header"
+                        style="display:flex; justify-content:space-between; align-items:center;"
+                    >
+                        <h2>🔔 Notification History</h2>
+                        <button
+                            class="btn-primary btn-small"
+                            on:click={sendTestNotification}
+                        >
+                            Trigger Test Notification
+                        </button>
+                    </div>
                     {#if notifications.length === 0}
                         <p class="no-data">No notifications yet.</p>
                     {:else}
