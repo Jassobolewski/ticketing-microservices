@@ -55,7 +55,8 @@
     // Auth functions
     async function handleAuth() {
         authError = "";
-        const endpoint = authMode === "login" ? "/auth/login" : "/auth/register";
+        const endpoint =
+            authMode === "login" ? "/auth/login" : "/auth/register";
 
         try {
             const response = await fetch(`${API_URL}${endpoint}`, {
@@ -143,7 +144,12 @@
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify({ title, description, category, priority }),
+                body: JSON.stringify({
+                    title,
+                    description,
+                    category,
+                    priority,
+                }),
             });
 
             const data = await response.json();
@@ -177,7 +183,11 @@
                 tickets = data.tickets || [];
             } else {
                 const errorData = await response.json().catch(() => ({}));
-                console.error("Failed to fetch tickets:", response.status, errorData);
+                console.error(
+                    "Failed to fetch tickets:",
+                    response.status,
+                    errorData,
+                );
             }
         } catch (err) {
             console.error("Network error fetching tickets:", err);
@@ -198,9 +208,12 @@
 
     async function fetchTicketHistory(ticketId) {
         try {
-            const response = await fetch(`${API_URL}/workflow/history/${ticketId}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const response = await fetch(
+                `${API_URL}/workflow/history/${ticketId}`,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                },
+            );
 
             if (response.ok) {
                 const data = await response.json();
@@ -214,9 +227,12 @@
     // Media (S5) functions
     async function fetchTicketFiles(ticketId) {
         try {
-            const response = await fetch(`${API_URL}/media/ticket/${ticketId}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const response = await fetch(
+                `${API_URL}/media/ticket/${ticketId}`,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                },
+            );
 
             if (response.ok) {
                 const data = await response.json();
@@ -284,9 +300,12 @@
     // Feedback (S8) functions
     async function fetchTicketFeedback(ticketId) {
         try {
-            const response = await fetch(`${API_URL}/feedback/ticket/${ticketId}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const response = await fetch(
+                `${API_URL}/feedback/ticket/${ticketId}`,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                },
+            );
 
             if (response.ok) {
                 const data = await response.json();
@@ -332,9 +351,12 @@
         if (!user) return;
 
         try {
-            const response = await fetch(`${API_URL}/notifications/history/${user.sub}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const response = await fetch(
+                `${API_URL}/notifications/history/${user.sub}`,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                },
+            );
 
             if (response.ok) {
                 const data = await response.json();
@@ -366,15 +388,22 @@
     // Workflow functions
     async function updateTicketPriority(ticketId, newPriority) {
         workflowError = "";
+        if (!ticketId || ticketId === "undefined") {
+            console.warn("Attempted to fetch history for undefined ticket ID");
+            return;
+        }
         try {
-            const response = await fetch(`${API_URL}/workflow/priority/${ticketId}`, {
-                method: "PATCH",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
+            const response = await fetch(
+                `${API_URL}/workflow/priority/${ticketId}`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ priority: newPriority }),
                 },
-                body: JSON.stringify({ priority: newPriority }),
-            });
+            );
 
             const data = await response.json().catch(() => ({}));
 
@@ -397,14 +426,17 @@
     async function updateTicketStatus(ticketId, newStatus) {
         workflowError = "";
         try {
-            const response = await fetch(`${API_URL}/workflow/status/${ticketId}`, {
-                method: "PATCH",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
+            const response = await fetch(
+                `${API_URL}/workflow/status/${ticketId}`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ status: newStatus }),
                 },
-                body: JSON.stringify({ status: newStatus }),
-            });
+            );
 
             const data = await response.json().catch(() => ({}));
 
@@ -427,14 +459,17 @@
     async function assignTicket(ticketId, assignedTo) {
         workflowError = "";
         try {
-            const response = await fetch(`${API_URL}/workflow/assign/${ticketId}`, {
-                method: "PATCH",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
+            const response = await fetch(
+                `${API_URL}/workflow/assign/${ticketId}`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ assigned_to: assignedTo || null }),
                 },
-                body: JSON.stringify({ assigned_to: assignedTo || null }),
-            });
+            );
 
             const data = await response.json().catch(() => ({}));
 
@@ -636,7 +671,9 @@
                                 <label for="category">Category</label>
                                 <select id="category" bind:value={category}>
                                     <option value="bug">Bug</option>
-                                    <option value="feature">Feature Request</option>
+                                    <option value="feature"
+                                        >Feature Request</option
+                                    >
                                     <option value="support">Support</option>
                                     <option value="other">Other</option>
                                 </select>
@@ -672,7 +709,9 @@
                             <div class="success">{ticketSuccess}</div>
                         {/if}
 
-                        <button type="submit" class="btn-primary">Create Ticket</button>
+                        <button type="submit" class="btn-primary"
+                            >Create Ticket</button
+                        >
                     </form>
                 </div>
 
@@ -687,28 +726,45 @@
                     {:else}
                         <div class="tickets-grid">
                             {#each tickets as ticket (ticket.id)}
-                                <div class="ticket-card" on:click={() => viewTicketDetails(ticket)}>
+                                <div
+                                    class="ticket-card"
+                                    on:click={() => viewTicketDetails(ticket)}
+                                >
                                     <div class="ticket-header">
                                         <h3>#{ticket.id} {ticket.title}</h3>
                                         <div class="badges">
                                             <span
                                                 class="badge-priority"
-                                                style="background-color: {getPriorityColor(ticket.priority)}20; color: {getPriorityColor(ticket.priority)}"
+                                                style="background-color: {getPriorityColor(
+                                                    ticket.priority,
+                                                )}20; color: {getPriorityColor(
+                                                    ticket.priority,
+                                                )}"
                                             >
                                                 {ticket.priority}
                                             </span>
                                         </div>
                                     </div>
-                                    <p class="ticket-description">{ticket.description}</p>
+                                    <p class="ticket-description">
+                                        {ticket.description}
+                                    </p>
                                     <div class="ticket-footer">
-                                        <span class="badge-category">{ticket.category}</span>
+                                        <span class="badge-category"
+                                            >{ticket.category}</span
+                                        >
                                         <span
                                             class="ticket-status"
-                                            style="color: {getStatusColor(ticket.status)}"
+                                            style="color: {getStatusColor(
+                                                ticket.status,
+                                            )}"
                                         >
                                             ● {ticket.status}
                                         </span>
-                                        <span class="ticket-date">{formatDate(ticket.created_at)}</span>
+                                        <span class="ticket-date"
+                                            >{formatDate(
+                                                ticket.created_at,
+                                            )}</span
+                                        >
                                     </div>
                                 </div>
                             {/each}
@@ -722,21 +778,28 @@
                     {#if analytics}
                         <div class="stats-grid">
                             <div class="stat-card">
-                                <div class="stat-value">{analytics.metrics.tickets.total}</div>
+                                <div class="stat-value">
+                                    {analytics.metrics.tickets.total}
+                                </div>
                                 <div class="stat-label">Total Tickets</div>
                             </div>
                             <div class="stat-card">
-                                <div class="stat-value">{analytics.active_users}</div>
+                                <div class="stat-value">
+                                    {analytics.active_users}
+                                </div>
                                 <div class="stat-label">Active Users (30d)</div>
                             </div>
                             <div class="stat-card">
                                 <div class="stat-value">
-                                    {analytics.metrics.feedback.average_rating || "N/A"}
+                                    {analytics.metrics.feedback
+                                        .average_rating || "N/A"}
                                 </div>
                                 <div class="stat-label">Avg Rating</div>
                             </div>
                             <div class="stat-card">
-                                <div class="stat-value">{analytics.metrics.feedback.total}</div>
+                                <div class="stat-value">
+                                    {analytics.metrics.feedback.total}
+                                </div>
                                 <div class="stat-label">Total Feedback</div>
                             </div>
                         </div>
@@ -746,14 +809,23 @@
                                 <h3>Tickets by Status</h3>
                                 {#each analytics.metrics.tickets.by_status as status}
                                     <div class="bar-item">
-                                        <span class="bar-label">{status.status}</span>
+                                        <span class="bar-label"
+                                            >{status.status}</span
+                                        >
                                         <div class="bar-container">
                                             <div
                                                 class="bar"
-                                                style="width: {(status.count / analytics.metrics.tickets.total) * 100}%; background-color: {getStatusColor(status.status)}"
+                                                style="width: {(status.count /
+                                                    analytics.metrics.tickets
+                                                        .total) *
+                                                    100}%; background-color: {getStatusColor(
+                                                    status.status,
+                                                )}"
                                             ></div>
                                         </div>
-                                        <span class="bar-value">{status.count}</span>
+                                        <span class="bar-value"
+                                            >{status.count}</span
+                                        >
                                     </div>
                                 {/each}
                             </div>
@@ -762,14 +834,23 @@
                                 <h3>Tickets by Priority</h3>
                                 {#each analytics.metrics.tickets.by_priority as priority}
                                     <div class="bar-item">
-                                        <span class="bar-label">{priority.priority}</span>
+                                        <span class="bar-label"
+                                            >{priority.priority}</span
+                                        >
                                         <div class="bar-container">
                                             <div
                                                 class="bar"
-                                                style="width: {(priority.count / analytics.metrics.tickets.total) * 100}%; background-color: {getPriorityColor(priority.priority)}"
+                                                style="width: {(priority.count /
+                                                    analytics.metrics.tickets
+                                                        .total) *
+                                                    100}%; background-color: {getPriorityColor(
+                                                    priority.priority,
+                                                )}"
                                             ></div>
                                         </div>
-                                        <span class="bar-value">{priority.count}</span>
+                                        <span class="bar-value"
+                                            >{priority.count}</span
+                                        >
                                     </div>
                                 {/each}
                             </div>
@@ -778,14 +859,21 @@
                                 <h3>Tickets by Category</h3>
                                 {#each analytics.metrics.tickets.by_category as cat}
                                     <div class="bar-item">
-                                        <span class="bar-label">{cat.category}</span>
+                                        <span class="bar-label"
+                                            >{cat.category}</span
+                                        >
                                         <div class="bar-container">
                                             <div
                                                 class="bar"
-                                                style="width: {(cat.count / analytics.metrics.tickets.total) * 100}%"
+                                                style="width: {(cat.count /
+                                                    analytics.metrics.tickets
+                                                        .total) *
+                                                    100}%"
                                             ></div>
                                         </div>
-                                        <span class="bar-value">{cat.count}</span>
+                                        <span class="bar-value"
+                                            >{cat.count}</span
+                                        >
                                     </div>
                                 {/each}
                             </div>
@@ -794,11 +882,19 @@
                                 <h3>Recent Activity (7 days)</h3>
                                 {#each analytics.metrics.tickets.recent_trend as trend}
                                     <div class="bar-item">
-                                        <span class="bar-label">{trend.date}</span>
+                                        <span class="bar-label"
+                                            >{trend.date}</span
+                                        >
                                         <div class="bar-container">
-                                            <div class="bar" style="width: {trend.count * 20}%"></div>
+                                            <div
+                                                class="bar"
+                                                style="width: {trend.count *
+                                                    20}%"
+                                            ></div>
                                         </div>
-                                        <span class="bar-value">{trend.count}</span>
+                                        <span class="bar-value"
+                                            >{trend.count}</span
+                                        >
                                     </div>
                                 {/each}
                             </div>
@@ -819,20 +915,35 @@
                                     </thead>
                                     <tbody>
                                         {#each analytics.recent_tickets as ticket}
-                                            <tr on:click={() => viewTicketDetails(ticket)}>
+                                            <tr
+                                                on:click={() =>
+                                                    viewTicketDetails(ticket)}
+                                            >
                                                 <td>#{ticket.id}</td>
                                                 <td>{ticket.title}</td>
                                                 <td>
-                                                    <span style="color: {getStatusColor(ticket.status)}">
+                                                    <span
+                                                        style="color: {getStatusColor(
+                                                            ticket.status,
+                                                        )}"
+                                                    >
                                                         {ticket.status}
                                                     </span>
                                                 </td>
                                                 <td>
-                                                    <span style="color: {getPriorityColor(ticket.priority)}">
+                                                    <span
+                                                        style="color: {getPriorityColor(
+                                                            ticket.priority,
+                                                        )}"
+                                                    >
                                                         {ticket.priority}
                                                     </span>
                                                 </td>
-                                                <td>{formatDate(ticket.created_at)}</td>
+                                                <td
+                                                    >{formatDate(
+                                                        ticket.created_at,
+                                                    )}</td
+                                                >
                                             </tr>
                                         {/each}
                                     </tbody>
@@ -854,20 +965,41 @@
                             {#each notifications as notification}
                                 <div class="notification-card">
                                     <div class="notification-header">
-                                        <span class="notification-type">{notification.type.replace(/_/g, " ")}</span>
-                                        <span class="notification-channel">{notification.channel}</span>
-                                        <span class="notification-status status-{notification.status}">
+                                        <span class="notification-type"
+                                            >{notification.type.replace(
+                                                /_/g,
+                                                " ",
+                                            )}</span
+                                        >
+                                        <span class="notification-channel"
+                                            >{notification.channel}</span
+                                        >
+                                        <span
+                                            class="notification-status status-{notification.status}"
+                                        >
                                             {notification.status}
                                         </span>
                                     </div>
-                                    <p class="notification-message">{notification.message}</p>
+                                    <p class="notification-message">
+                                        {notification.message}
+                                    </p>
                                     <div class="notification-footer">
                                         {#if notification.ticket_id}
-                                            <span>Ticket #{notification.ticket_id}</span>
+                                            <span
+                                                >Ticket #{notification.ticket_id}</span
+                                            >
                                         {/if}
-                                        <span>{formatDate(notification.created_at)}</span>
+                                        <span
+                                            >{formatDate(
+                                                notification.created_at,
+                                            )}</span
+                                        >
                                         {#if notification.sent_at}
-                                            <span>Sent: {formatDate(notification.sent_at)}</span>
+                                            <span
+                                                >Sent: {formatDate(
+                                                    notification.sent_at,
+                                                )}</span
+                                            >
                                         {/if}
                                     </div>
                                 </div>
@@ -903,19 +1035,31 @@
                             </div>
                             <div class="detail-item">
                                 <strong>Status</strong>
-                                <span style="color: {getStatusColor(selectedTicket.status)}">
+                                <span
+                                    style="color: {getStatusColor(
+                                        selectedTicket.status,
+                                    )}"
+                                >
                                     {selectedTicket.status}
                                 </span>
                             </div>
                             <div class="detail-item">
                                 <strong>Priority</strong>
-                                <span style="color: {getPriorityColor(selectedTicket.priority)}">
+                                <span
+                                    style="color: {getPriorityColor(
+                                        selectedTicket.priority,
+                                    )}"
+                                >
                                     {selectedTicket.priority}
                                 </span>
                             </div>
                             <div class="detail-item">
                                 <strong>Created</strong>
-                                <span>{formatDate(selectedTicket.created_at)}</span>
+                                <span
+                                    >{formatDate(
+                                        selectedTicket.created_at,
+                                    )}</span
+                                >
                             </div>
                         </div>
                     </div>
@@ -924,7 +1068,11 @@
                     <div class="section">
                         <div class="section-header">
                             <h3>📎 Attachments</h3>
-                            <button class="btn-small" on:click={() => (showFileUpload = !showFileUpload)}>
+                            <button
+                                class="btn-small"
+                                on:click={() =>
+                                    (showFileUpload = !showFileUpload)}
+                            >
                                 {showFileUpload ? "Cancel" : "+ Upload"}
                             </button>
                         </div>
@@ -945,12 +1093,25 @@
                         {#if ticketFiles.length > 0}
                             <div class="files-list">
                                 {#each ticketFiles as file}
-                                    <div class="file-item" on:click={() => downloadFile(file.id, file.original_filename)}>
+                                    <div
+                                        class="file-item"
+                                        on:click={() =>
+                                            downloadFile(
+                                                file.id,
+                                                file.original_filename,
+                                            )}
+                                    >
                                         <span class="file-icon">📄</span>
                                         <div class="file-info">
-                                            <div class="file-name">{file.original_filename}</div>
+                                            <div class="file-name">
+                                                {file.original_filename}
+                                            </div>
                                             <div class="file-meta">
-                                                {(file.file_size / 1024).toFixed(1)} KB • {formatDate(file.uploaded_at)}
+                                                {(
+                                                    file.file_size / 1024
+                                                ).toFixed(1)} KB • {formatDate(
+                                                    file.uploaded_at,
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -968,7 +1129,9 @@
                         {#if ticketFeedback && ticketFeedback.feedback.length > 0}
                             <div class="feedback-summary">
                                 <div class="rating-display">
-                                    Average Rating: <strong>{ticketFeedback.average_rating}/5</strong>
+                                    Average Rating: <strong
+                                        >{ticketFeedback.average_rating}/5</strong
+                                    >
                                     ({ticketFeedback.total_feedback} reviews)
                                 </div>
                             </div>
@@ -976,11 +1139,17 @@
                             <div class="feedback-list">
                                 {#each ticketFeedback.feedback as fb}
                                     <div class="feedback-item">
-                                        <div class="feedback-rating">{"⭐".repeat(fb.rating)}</div>
+                                        <div class="feedback-rating">
+                                            {"⭐".repeat(fb.rating)}
+                                        </div>
                                         {#if fb.comment}
                                             <p>{fb.comment}</p>
                                         {/if}
-                                        <small>User #{fb.user_id} • {formatDate(fb.created_at)}</small>
+                                        <small
+                                            >User #{fb.user_id} • {formatDate(
+                                                fb.created_at,
+                                            )}</small
+                                        >
                                     </div>
                                 {/each}
                             </div>
@@ -1007,7 +1176,11 @@
                             {#if feedbackError}
                                 <div class="error">{feedbackError}</div>
                             {/if}
-                            <button class="btn-primary" on:click={submitFeedback}>Submit Feedback</button>
+                            <button
+                                class="btn-primary"
+                                on:click={submitFeedback}
+                                >Submit Feedback</button
+                            >
                         </div>
                     </div>
 
@@ -1027,8 +1200,13 @@
                                         {#each ["low", "medium", "high", "urgent"] as p}
                                             <button
                                                 class="btn-workflow"
-                                                class:active={selectedTicket.priority === p}
-                                                on:click={() => updateTicketPriority(selectedTicket.id, p)}
+                                                class:active={selectedTicket.priority ===
+                                                    p}
+                                                on:click={() =>
+                                                    updateTicketPriority(
+                                                        selectedTicket.id,
+                                                        p,
+                                                    )}
                                             >
                                                 {p}
                                             </button>
@@ -1042,8 +1220,13 @@
                                         {#each ["new", "assigned", "in_progress", "resolved"] as s}
                                             <button
                                                 class="btn-workflow"
-                                                class:active={selectedTicket.status === s}
-                                                on:click={() => updateTicketStatus(selectedTicket.id, s)}
+                                                class:active={selectedTicket.status ===
+                                                    s}
+                                                on:click={() =>
+                                                    updateTicketStatus(
+                                                        selectedTicket.id,
+                                                        s,
+                                                    )}
                                             >
                                                 {s}
                                             </button>
@@ -1056,13 +1239,21 @@
                                     <div class="button-group">
                                         <button
                                             class="btn-workflow"
-                                            on:click={() => assignTicket(selectedTicket.id, user.sub)}
+                                            on:click={() =>
+                                                assignTicket(
+                                                    selectedTicket.id,
+                                                    user.sub,
+                                                )}
                                         >
                                             Assign to Me
                                         </button>
                                         <button
                                             class="btn-workflow"
-                                            on:click={() => assignTicket(selectedTicket.id, null)}
+                                            on:click={() =>
+                                                assignTicket(
+                                                    selectedTicket.id,
+                                                    null,
+                                                )}
                                         >
                                             Unassign
                                         </button>
@@ -1082,10 +1273,16 @@
                                 {#each ticketHistory as change}
                                     <div class="history-item">
                                         <strong>{change.field_name}</strong>
-                                        changed from <code>{change.old_value || "null"}</code>
+                                        changed from
+                                        <code>{change.old_value || "null"}</code
+                                        >
                                         to <code>{change.new_value}</code>
                                         <br />
-                                        <small>by User #{change.changed_by} • {formatDate(change.changed_at)}</small>
+                                        <small
+                                            >by User #{change.changed_by} • {formatDate(
+                                                change.changed_at,
+                                            )}</small
+                                        >
                                     </div>
                                 {/each}
                             </div>
@@ -1101,7 +1298,8 @@
     :global(body) {
         margin: 0;
         padding: 0;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-family:
+            -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
         min-height: 100vh;
     }

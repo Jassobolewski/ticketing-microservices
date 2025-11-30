@@ -1,8 +1,9 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const { Pool } = require("pg");
-
+const cors = require("cors");
 const app = express();
+app.use(cors());
 app.use(express.json());
 
 const pool = new Pool({
@@ -16,12 +17,11 @@ const VALID_STATUSES = ["new", "assigned", "in_progress", "resolved"];
 const VALID_PRIORITIES = ["low", "medium", "high", "urgent"];
 
 // Status flow validation - Allow all transitions for flexibility
-// Staff members should be able to move tickets to any status as needed
 const STATUS_TRANSITIONS = {
   new: ["assigned", "in_progress", "resolved"],
   assigned: ["new", "in_progress", "resolved"],
   in_progress: ["new", "assigned", "resolved"],
-  resolved: ["new", "assigned", "in_progress"], // Allow reopening resolved tickets
+  resolved: ["new", "assigned", "in_progress"],
 };
 
 // Middleware to verify JWT and extract user info
@@ -51,19 +51,19 @@ function requireStaff(req, res, next) {
 
 // Initialize workflow tables
 async function init() {
-  // Add workflow columns to tickets table if they don't exist
   try {
     await pool.query(`
-      ALTER TABLE tickets 
+      ALTER TABLE tickets
       ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'medium',
       ADD COLUMN IF NOT EXISTS assigned_to INTEGER,
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT NOW();
     `);
   } catch (err) {
-    console.log("Tickets table columns may already exist or table doesn't exist yet");
+    console.log(
+      "Tickets table columns may already exist or table doesn't exist yet",
+    );
   }
 
-  // Create ticket_history table
   await pool.query(`
     CREATE TABLE IF NOT EXISTS ticket_history (
       id SERIAL PRIMARY KEY,
@@ -84,7 +84,7 @@ async function logChange(ticketId, userId, fieldName, oldValue, newValue) {
   await pool.query(
     `INSERT INTO ticket_history (ticket_id, changed_by, field_name, old_value, new_value)
      VALUES ($1, $2, $3, $4, $5)`,
-    [ticketId, userId, fieldName, oldValue, newValue]
+    [ticketId, userId, fieldName, oldValue, newValue],
   );
 }
 
@@ -104,10 +104,9 @@ app.patch("/priority/:id", authenticate, requireStaff, async (req, res) => {
       });
     }
 
-    // Get current ticket
     const current = await pool.query(
       "SELECT priority FROM tickets WHERE id = $1",
-      [ticketId]
+      [ticketId],
     );
 
     if (current.rows.length === 0) {
@@ -116,22 +115,20 @@ app.patch("/priority/:id", authenticate, requireStaff, async (req, res) => {
 
     const oldPriority = current.rows[0].priority;
 
-    // Update priority
     const result = await pool.query(
-      `UPDATE tickets 
-       SET priority = $1, updated_at = NOW() 
-       WHERE id = $2 
+      `UPDATE tickets
+       SET priority = $1, updated_at = NOW()
+       WHERE id = $2
        RETURNING id, user_id, title, description, category, status, priority, assigned_to, created_at`,
-      [priority.toLowerCase(), ticketId]
+      [priority.toLowerCase(), ticketId],
     );
 
-    // Log the change
     await logChange(
       ticketId,
       req.user.sub,
       "priority",
       oldPriority,
-      priority.toLowerCase()
+      priority.toLowerCase(),
     );
 
     res.json(result.rows[0]);
@@ -141,7 +138,7 @@ app.patch("/priority/:id", authenticate, requireStaff, async (req, res) => {
   }
 });
 
-// PATCH /status/:id - Update ticket status with workflow validation (staff only)
+// PATCH /status/:id - Update ticket status with workflow validation
 app.patch("/status/:id", authenticate, requireStaff, async (req, res) => {
   try {
     const ticketId = parseInt(req.params.id);
@@ -157,17 +154,17 @@ app.patch("/status/:id", authenticate, requireStaff, async (req, res) => {
       });
     }
 
-    // Get current ticket
     const current = await pool.query(
       "SELECT status FROM tickets WHERE id = $1",
-      [ticketId]
+      [ticketId],
     );
 
     if (current.rows.length === 0) {
       return res.status(404).json({ error: "ticket not found" });
     }
 
-    const currentStatus = current.rows[0].status;
+    // FIX: Normalize DB status to lowercase
+    const currentStatus = current.rows[0].status.toLowerCase();
     const newStatus = status.toLowerCase();
 
     // Validate status transition
@@ -180,16 +177,14 @@ app.patch("/status/:id", authenticate, requireStaff, async (req, res) => {
       });
     }
 
-    // Update status
     const result = await pool.query(
-      `UPDATE tickets 
-       SET status = $1, updated_at = NOW() 
-       WHERE id = $2 
+      `UPDATE tickets
+       SET status = $1, updated_at = NOW()
+       WHERE id = $2
        RETURNING id, user_id, title, description, category, status, priority, assigned_to, created_at`,
-      [newStatus, ticketId]
+      [newStatus, ticketId],
     );
 
-    // Log the change
     await logChange(ticketId, req.user.sub, "status", currentStatus, newStatus);
 
     res.json(result.rows[0]);
@@ -199,7 +194,7 @@ app.patch("/status/:id", authenticate, requireStaff, async (req, res) => {
   }
 });
 
-// PATCH /assign/:id - Assign ticket to staff member (staff only)
+// PATCH /assign/:id - Assign ticket to staff member
 app.patch("/assign/:id", authenticate, requireStaff, async (req, res) => {
   try {
     const ticketId = parseInt(req.params.id);
@@ -209,10 +204,9 @@ app.patch("/assign/:id", authenticate, requireStaff, async (req, res) => {
       return res.status(400).json({ error: "invalid ticket id" });
     }
 
-    // Get current ticket
     const current = await pool.query(
       "SELECT status, assigned_to FROM tickets WHERE id = $1",
-      [ticketId]
+      [ticketId],
     );
 
     if (current.rows.length === 0) {
@@ -220,7 +214,8 @@ app.patch("/assign/:id", authenticate, requireStaff, async (req, res) => {
     }
 
     const oldAssignedTo = current.rows[0].assigned_to;
-    const currentStatus = current.rows[0].status;
+    // FIX: Normalize DB status to lowercase
+    const currentStatus = current.rows[0].status.toLowerCase();
 
     // Auto-update status to 'assigned' if currently 'new'
     let newStatus = currentStatus;
@@ -228,22 +223,20 @@ app.patch("/assign/:id", authenticate, requireStaff, async (req, res) => {
       newStatus = "assigned";
     }
 
-    // Update assignment and status
     const result = await pool.query(
-      `UPDATE tickets 
-       SET assigned_to = $1, status = $2, updated_at = NOW() 
-       WHERE id = $3 
+      `UPDATE tickets
+       SET assigned_to = $1, status = $2, updated_at = NOW()
+       WHERE id = $3
        RETURNING id, user_id, title, description, category, status, priority, assigned_to, created_at`,
-      [assigned_to || null, newStatus, ticketId]
+      [assigned_to || null, newStatus, ticketId],
     );
 
-    // Log the changes
     await logChange(
       ticketId,
       req.user.sub,
       "assigned_to",
       oldAssignedTo ? oldAssignedTo.toString() : null,
-      assigned_to ? assigned_to.toString() : null
+      assigned_to ? assigned_to.toString() : null,
     );
 
     if (newStatus !== currentStatus) {
@@ -252,7 +245,7 @@ app.patch("/assign/:id", authenticate, requireStaff, async (req, res) => {
         req.user.sub,
         "status",
         currentStatus,
-        newStatus
+        newStatus,
       );
     }
 
@@ -272,7 +265,6 @@ app.get("/history/:id", authenticate, async (req, res) => {
       return res.status(400).json({ error: "invalid ticket id" });
     }
 
-    // Check if user has access to this ticket
     let accessCheck;
     if (req.user.role === "staff" || req.user.role === "admin") {
       accessCheck = await pool.query("SELECT id FROM tickets WHERE id = $1", [
@@ -281,7 +273,7 @@ app.get("/history/:id", authenticate, async (req, res) => {
     } else {
       accessCheck = await pool.query(
         "SELECT id FROM tickets WHERE id = $1 AND user_id = $2",
-        [ticketId, req.user.sub]
+        [ticketId, req.user.sub],
       );
     }
 
@@ -289,13 +281,12 @@ app.get("/history/:id", authenticate, async (req, res) => {
       return res.status(404).json({ error: "ticket not found" });
     }
 
-    // Get history
     const result = await pool.query(
-      `SELECT id, ticket_id, changed_by, field_name, old_value, new_value, changed_at 
-       FROM ticket_history 
-       WHERE ticket_id = $1 
+      `SELECT id, ticket_id, changed_by, field_name, old_value, new_value, changed_at
+       FROM ticket_history
+       WHERE ticket_id = $1
        ORDER BY changed_at DESC`,
-      [ticketId]
+      [ticketId],
     );
 
     res.json({ history: result.rows });
@@ -305,19 +296,19 @@ app.get("/history/:id", authenticate, async (req, res) => {
   }
 });
 
-// GET /queue - Get prioritized ticket queue for staff (staff only)
+// GET /queue - Get prioritized ticket queue for staff
 app.get("/queue", authenticate, requireStaff, async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT id, user_id, title, description, category, status, priority, assigned_to, created_at 
-      FROM tickets 
+      SELECT id, user_id, title, description, category, status, priority, assigned_to, created_at
+      FROM tickets
       WHERE status != 'resolved'
-      ORDER BY 
-        CASE priority 
-          WHEN 'urgent' THEN 1 
-          WHEN 'high' THEN 2 
-          WHEN 'medium' THEN 3 
-          WHEN 'low' THEN 4 
+      ORDER BY
+        CASE priority
+          WHEN 'urgent' THEN 1
+          WHEN 'high' THEN 2
+          WHEN 'medium' THEN 3
+          WHEN 'low' THEN 4
         END,
         created_at ASC
     `);
@@ -329,7 +320,7 @@ app.get("/queue", authenticate, requireStaff, async (req, res) => {
   }
 });
 
-// POST /auto-priority/:id - Auto-assign priority based on category (internal use)
+// POST /auto-priority/:id - Auto-assign priority based on category
 app.post("/auto-priority/:id", authenticate, async (req, res) => {
   try {
     const ticketId = parseInt(req.params.id);
@@ -339,7 +330,6 @@ app.post("/auto-priority/:id", authenticate, async (req, res) => {
       return res.status(400).json({ error: "invalid ticket id" });
     }
 
-    // Auto-priority mapping
     const CATEGORY_PRIORITY_MAP = {
       bug: "high",
       feature: "medium",
@@ -349,12 +339,11 @@ app.post("/auto-priority/:id", authenticate, async (req, res) => {
 
     const priority = CATEGORY_PRIORITY_MAP[category] || "medium";
 
-    // Update priority
     await pool.query(
-      `UPDATE tickets 
-       SET priority = $1, updated_at = NOW() 
+      `UPDATE tickets
+       SET priority = $1, updated_at = NOW()
        WHERE id = $2`,
-      [priority, ticketId]
+      [priority, ticketId],
     );
 
     res.json({ ticketId, priority });
@@ -364,16 +353,16 @@ app.post("/auto-priority/:id", authenticate, async (req, res) => {
   }
 });
 
-app.get("/health", (req, res) => res.json({ status: "ok", service: "s4-workflow" }));
+app.get("/health", (req, res) =>
+  res.json({ status: "ok", service: "s4-workflow" }),
+);
 
 const PORT = process.env.PORT || 3004;
-const registerService = require('./register-helper');
+const registerService = require("./register-helper");
 
 init().then(() => {
   app.listen(PORT, async () => {
     console.log(`S4 Workflow service running on port ${PORT}`);
-
-    // Register with service registry
-    await registerService('s4-workflow', 's4-workflow', PORT, '/health');
+    await registerService("s4-workflow", "s4-workflow", PORT, "/health");
   });
 });
