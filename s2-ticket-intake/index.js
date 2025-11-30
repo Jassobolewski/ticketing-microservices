@@ -144,6 +144,11 @@ app.get("/", authenticate, async (req, res) => {
   }
 });
 
+// Health check endpoint (MUST come before /:id to avoid being caught by parameter matching)
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", service: "s2-tickets" });
+});
+
 // GET /:id - Get a specific ticket (staff can view any, users only their own)
 app.get("/:id", authenticate, async (req, res) => {
   try {
@@ -249,11 +254,6 @@ app.patch("/:id", authenticate, async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "internal error" });
   }
-});
-
-// Health check endpoint
-app.get("/health", (req, res) => {
-  res.json({ status: "ok", service: "s2-tickets" });
 });
 
 const PORT = process.env.PORT || 3002;
