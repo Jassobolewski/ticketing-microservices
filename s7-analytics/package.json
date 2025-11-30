@@ -1,0 +1,14 @@
+{
+  "name": "s7-analytics",
+  "version": "1.0.0",
+  "description": "Analytics service for metrics and dashboards",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "pg": "^8.16.3",
+    "jsonwebtoken": "^9.0.2"
+  }
+}
