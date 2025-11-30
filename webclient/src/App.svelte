@@ -1036,30 +1036,15 @@
                                 <div class="control-group">
                                     <label>Status:</label>
                                     <div class="button-group">
-                                        {#if selectedTicket.status === "new"}
+                                        {#each ["new", "assigned", "in_progress", "resolved"] as s}
                                             <button
                                                 class="btn-workflow"
-                                                on:click={() => updateTicketStatus(selectedTicket.id, "assigned")}
+                                                class:active={selectedTicket.status === s}
+                                                on:click={() => updateTicketStatus(selectedTicket.id, s)}
                                             >
-                                                → Assigned
+                                                {s}
                                             </button>
-                                        {:else if selectedTicket.status === "assigned"}
-                                            <button
-                                                class="btn-workflow"
-                                                on:click={() => updateTicketStatus(selectedTicket.id, "in_progress")}
-                                            >
-                                                → In Progress
-                                            </button>
-                                        {:else if selectedTicket.status === "in_progress"}
-                                            <button
-                                                class="btn-workflow"
-                                                on:click={() => updateTicketStatus(selectedTicket.id, "resolved")}
-                                            >
-                                                → Resolved
-                                            </button>
-                                        {:else}
-                                            <span>Ticket is resolved</span>
-                                        {/if}
+                                        {/each}
                                     </div>
                                 </div>
 
