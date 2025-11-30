@@ -15,12 +15,13 @@ const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
 const VALID_STATUSES = ["new", "assigned", "in_progress", "resolved"];
 const VALID_PRIORITIES = ["low", "medium", "high", "urgent"];
 
-// Status flow validation
+// Status flow validation - Allow all transitions for flexibility
+// Staff members should be able to move tickets to any status as needed
 const STATUS_TRANSITIONS = {
-  new: ["assigned"],
-  assigned: ["in_progress"],
-  in_progress: ["resolved"],
-  resolved: [], // Cannot transition from resolved
+  new: ["assigned", "in_progress", "resolved"],
+  assigned: ["new", "in_progress", "resolved"],
+  in_progress: ["new", "assigned", "resolved"],
+  resolved: ["new", "assigned", "in_progress"], // Allow reopening resolved tickets
 };
 
 // Middleware to verify JWT and extract user info
