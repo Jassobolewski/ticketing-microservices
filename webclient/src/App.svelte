@@ -182,6 +182,10 @@
     }
 
     async function viewTicketDetails(ticket) {
+        if (!ticket || !ticket.id) {
+            console.error("Invalid ticket:", ticket);
+            return;
+        }
         selectedTicket = ticket;
         showTicketModal = true;
         await fetchTicketHistory(ticket.id);
@@ -294,7 +298,7 @@
     async function submitFeedback() {
         feedbackError = "";
         try {
-            const response = await fetch(`${API_URL}/feedback/feedback`, {
+            const response = await fetch(`${API_URL}/feedback`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
