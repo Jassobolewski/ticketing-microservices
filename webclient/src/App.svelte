@@ -175,9 +175,12 @@
             if (response.ok) {
                 const data = await response.json();
                 tickets = data.tickets || [];
+            } else {
+                const errorData = await response.json().catch(() => ({}));
+                console.error("Failed to fetch tickets:", response.status, errorData);
             }
         } catch (err) {
-            console.error("Failed to fetch tickets:", err);
+            console.error("Network error fetching tickets:", err);
         }
     }
 

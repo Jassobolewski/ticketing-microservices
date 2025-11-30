@@ -91,8 +91,8 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok", service: "s8-feedback" });
 });
 
-// POST /feedback - Submit feedback for a ticket
-app.post("/feedback", authenticate, async (req, res) => {
+// POST / - Submit feedback for a ticket
+app.post("/", authenticate, async (req, res) => {
   try {
     const { ticket_id, rating, comment } = req.body;
 
