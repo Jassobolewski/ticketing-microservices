@@ -44,12 +44,16 @@ async function init() {
   `);
 
   // Add priority column if it doesn't exist (for existing databases)
-  await pool.query(`
+  await pool
+    .query(
+      `
     ALTER TABLE tickets
     ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'medium';
-  `).catch(() => {
-    // Column might already exist, ignore error
-  });
+  `,
+    )
+    .catch(() => {
+      // Column might already exist, ignore error
+    });
 
   console.log("Tickets table ready");
 }
@@ -95,7 +99,13 @@ app.post("/", authenticate, async (req, res) => {
       `INSERT INTO tickets (user_id, title, description, category, priority)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING id, user_id, title, description, category, status, priority, created_at`,
-      [req.user.sub, title, description, category.toLowerCase(), ticketPriority],
+      [
+        req.user.sub,
+        title,
+        description,
+        category.toLowerCase(),
+        ticketPriority,
+      ],
     );
 
     res.status(201).json(result.rows[0]);
@@ -108,7 +118,7 @@ app.post("/", authenticate, async (req, res) => {
 // GET / - List tickets (users see their own, staff see all)
 app.get("/", authenticate, async (req, res) => {
   try {
-    const result = await pool.query(
+    result = await pool.query(
       `SELECT id, user_id, title, description, category, status, priority, created_at
        FROM tickets
        WHERE user_id = $1
@@ -116,7 +126,7 @@ app.get("/", authenticate, async (req, res) => {
       [req.user.sub],
     );
 
-    const result = await pool.query(query, params);
+    result = await pool.query(query, params);
     res.json({ tickets: result.rows });
   } catch (err) {
     console.error(err);
