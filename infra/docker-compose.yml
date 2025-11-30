@@ -41,6 +41,8 @@ services:
       JWT_SECRET: super-secret-change-me
       PORT: 3002
       REGISTRY_URL: http://s3-registry:3003
+    ports:
+      - "3002:3002"
     depends_on:
       - postgres
       - s3-registry
