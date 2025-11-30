@@ -251,7 +251,27 @@
     }
 
     async function downloadFile(fileId, filename) {
-        window.open(`${API_URL}/media/${fileId}`, "_blank");
+        try {
+            const response = await fetch(`${API_URL}/media/${fileId}`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } else {
+                alert("Failed to download file");
+            }
+        } catch (err) {
+            alert("Error downloading file: " + err.message);
+        }
     }
 
     // Feedback (S8) functions
@@ -349,15 +369,15 @@
                 body: JSON.stringify({ priority: newPriority }),
             });
 
+            const data = await response.json().catch(() => ({}));
+
             if (!response.ok) {
-                const data = await response.json().catch(() => ({}));
                 workflowError = data.error || "Failed to update priority";
                 return;
             }
 
             await fetchTickets();
             if (selectedTicket?.id === ticketId) {
-                const data = await response.json().catch(() => null);
                 selectedTicket = data || selectedTicket;
                 await fetchTicketHistory(ticketId);
             }
@@ -379,15 +399,15 @@
                 body: JSON.stringify({ status: newStatus }),
             });
 
+            const data = await response.json().catch(() => ({}));
+
             if (!response.ok) {
-                const data = await response.json().catch(() => ({}));
                 workflowError = data.error || "Failed to update status";
                 return;
             }
 
             await fetchTickets();
             if (selectedTicket?.id === ticketId) {
-                const data = await response.json().catch(() => null);
                 selectedTicket = data || selectedTicket;
                 await fetchTicketHistory(ticketId);
             }
@@ -409,15 +429,15 @@
                 body: JSON.stringify({ assigned_to: assignedTo || null }),
             });
 
+            const data = await response.json().catch(() => ({}));
+
             if (!response.ok) {
-                const data = await response.json().catch(() => ({}));
                 workflowError = data.error || "Failed to assign ticket";
                 return;
             }
 
             await fetchTickets();
             if (selectedTicket?.id === ticketId) {
-                const data = await response.json().catch(() => null);
                 selectedTicket = data || selectedTicket;
                 await fetchTicketHistory(ticketId);
             }
@@ -1090,7 +1110,7 @@
         margin: 0;
         padding: 0;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
         min-height: 100vh;
     }
 
@@ -1101,30 +1121,30 @@
     }
 
     h1 {
-        color: white;
+        color: #ffffff;
         text-align: center;
         font-size: 2.5rem;
         margin-bottom: 2rem;
-        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     }
 
     h2 {
-        color: #333;
+        color: #e0e0e0;
         margin-bottom: 1.5rem;
     }
 
     h3 {
-        color: #555;
+        color: #d0d0d0;
         margin-top: 0;
         margin-bottom: 1rem;
     }
 
     /* Auth Section */
     .auth-section {
-        background: white;
+        background: #2d2d44;
         border-radius: 12px;
         padding: 2rem;
-        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
         max-width: 400px;
         margin: 0 auto;
     }
@@ -1138,8 +1158,9 @@
     .auth-toggle button {
         flex: 1;
         padding: 0.75rem;
-        border: 2px solid #e0e0e0;
-        background: white;
+        border: 2px solid #444;
+        background: #1a1a2e;
+        color: #ccc;
         border-radius: 8px;
         cursor: pointer;
         font-weight: 600;
@@ -1154,14 +1175,20 @@
 
     /* User Bar */
     .user-bar {
-        background: white;
+        background: #2d2d44;
         border-radius: 12px;
         padding: 1rem 1.5rem;
         display: flex;
         justify-content: space-between;
         align-items: center;
         margin-bottom: 1.5rem;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        color: #e0e0e0;
+    }
+
+    .user-bar span {
+        color: #e0e0e0;
+        font-weight: 600;
     }
 
     .role-badge {
@@ -1182,7 +1209,7 @@
     }
 
     .tabs button {
-        background: rgba(255, 255, 255, 0.9);
+        background: #2d2d44;
         border: none;
         padding: 0.75rem 1.5rem;
         border-radius: 8px;
@@ -1192,11 +1219,13 @@
         display: flex;
         align-items: center;
         gap: 0.5rem;
+        color: #ccc;
     }
 
     .tabs button.active {
-        background: white;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        background: #667eea;
+        color: white;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
         transform: translateY(-2px);
     }
 
@@ -1213,11 +1242,11 @@
     .analytics-dashboard,
     .notifications-panel,
     .tickets-list {
-        background: white;
+        background: #2d2d44;
         border-radius: 12px;
         padding: 2rem;
         margin-bottom: 1.5rem;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     }
 
     .form-group {
@@ -1235,7 +1264,7 @@
         display: block;
         margin-bottom: 0.5rem;
         font-weight: 600;
-        color: #333;
+        color: #e0e0e0;
     }
 
     input,
@@ -1243,7 +1272,9 @@
     select {
         width: 100%;
         padding: 0.75rem;
-        border: 2px solid #e0e0e0;
+        border: 2px solid #444;
+        background: #1a1a2e;
+        color: #e0e0e0;
         border-radius: 8px;
         font-size: 1rem;
         transition: border-color 0.2s;
@@ -1256,6 +1287,7 @@
     select:focus {
         outline: none;
         border-color: #667eea;
+        background: #16213e;
     }
 
     button {
@@ -1280,8 +1312,12 @@
     }
 
     .btn-secondary {
-        background: #e0e0e0;
-        color: #333;
+        background: #444;
+        color: #e0e0e0;
+    }
+
+    .btn-secondary:hover {
+        background: #555;
     }
 
     .btn-small {
@@ -1312,7 +1348,8 @@
     }
 
     .ticket-card {
-        border: 2px solid #e0e0e0;
+        border: 2px solid #444;
+        background: #1a1a2e;
         border-radius: 8px;
         padding: 1.5rem;
         transition: all 0.2s;
@@ -1321,7 +1358,7 @@
 
     .ticket-card:hover {
         border-color: #667eea;
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
         transform: translateY(-2px);
     }
 
@@ -1334,7 +1371,7 @@
 
     .ticket-header h3 {
         margin: 0;
-        color: #333;
+        color: #e0e0e0;
         font-size: 1.125rem;
     }
 
@@ -1348,7 +1385,7 @@
     }
 
     .ticket-description {
-        color: #666;
+        color: #b0b0b0;
         margin: 0 0 1rem 0;
         line-height: 1.5;
     }
@@ -1359,12 +1396,12 @@
         align-items: center;
         font-size: 0.875rem;
         gap: 1rem;
-        color: #666;
+        color: #999;
     }
 
     .badge-category {
-        background: #f3f4f6;
-        color: #6b7280;
+        background: #444;
+        color: #ccc;
         padding: 0.25rem 0.75rem;
         border-radius: 12px;
         font-size: 0.85rem;
@@ -1412,7 +1449,7 @@
     }
 
     .chart-card {
-        background: #f9fafb;
+        background: #1a1a2e;
         padding: 1.5rem;
         border-radius: 8px;
     }
@@ -1429,10 +1466,11 @@
         font-size: 0.875rem;
         font-weight: 600;
         text-transform: capitalize;
+        color: #ccc;
     }
 
     .bar-container {
-        background: #e5e7eb;
+        background: #0f0f1e;
         height: 24px;
         border-radius: 4px;
         overflow: hidden;
@@ -1447,7 +1485,7 @@
     .bar-value {
         text-align: right;
         font-weight: 600;
-        color: #666;
+        color: #999;
     }
 
     .table-container {
@@ -1466,10 +1504,14 @@
         border-bottom: 1px solid #e5e7eb;
     }
 
+    td {
+        color: #ccc;
+    }
+
     th {
-        background: #f9fafb;
+        background: #0f0f1e;
         font-weight: 600;
-        color: #333;
+        color: #e0e0e0;
     }
 
     tbody tr {
@@ -1478,7 +1520,7 @@
     }
 
     tbody tr:hover {
-        background: #f9fafb;
+        background: #16213e;
     }
 
     /* Notifications */
@@ -1488,7 +1530,8 @@
     }
 
     .notification-card {
-        border: 2px solid #e0e0e0;
+        border: 2px solid #444;
+        background: #1a1a2e;
         border-radius: 8px;
         padding: 1rem;
     }
@@ -1541,7 +1584,7 @@
     }
 
     .notification-message {
-        color: #333;
+        color: #ccc;
         margin: 0.5rem 0;
     }
 
@@ -1549,7 +1592,7 @@
         display: flex;
         gap: 1rem;
         font-size: 0.75rem;
-        color: #666;
+        color: #999;
     }
 
     /* Modal */
@@ -1559,7 +1602,7 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
+        background: rgba(0, 0, 0, 0.7);
         display: flex;
         justify-content: center;
         align-items: center;
@@ -1568,13 +1611,13 @@
     }
 
     .modal {
-        background: white;
+        background: #2d2d44;
         border-radius: 12px;
         max-width: 900px;
         width: 100%;
         max-height: 90vh;
         overflow-y: auto;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
     }
 
     .modal-header {
@@ -1582,11 +1625,15 @@
         justify-content: space-between;
         align-items: center;
         padding: 1.5rem 2rem;
-        border-bottom: 2px solid #e0e0e0;
+        border-bottom: 2px solid #444;
         position: sticky;
         top: 0;
-        background: white;
+        background: #2d2d44;
         z-index: 1;
+    }
+
+    .modal-header h2 {
+        color: #e0e0e0;
     }
 
     .close-btn {
@@ -1594,12 +1641,12 @@
         border: none;
         font-size: 1.5rem;
         cursor: pointer;
-        color: #666;
+        color: #999;
         padding: 0.25rem 0.5rem;
     }
 
     .close-btn:hover {
-        color: #333;
+        color: #fff;
     }
 
     .modal-body {
@@ -1609,7 +1656,7 @@
     .section {
         margin-bottom: 2rem;
         padding-bottom: 2rem;
-        border-bottom: 2px solid #e0e0e0;
+        border-bottom: 2px solid #444;
     }
 
     .section:last-child {
@@ -1625,6 +1672,11 @@
 
     .detail-row {
         margin-bottom: 1rem;
+        color: #ccc;
+    }
+
+    .detail-row p {
+        color: #b0b0b0;
     }
 
     .detail-grid {
@@ -1634,9 +1686,13 @@
         margin-top: 1rem;
     }
 
+    .detail-item {
+        color: #e0e0e0;
+    }
+
     .detail-item strong {
         display: block;
-        color: #666;
+        color: #999;
         font-size: 0.875rem;
         margin-bottom: 0.25rem;
     }
@@ -1652,14 +1708,14 @@
         align-items: center;
         gap: 1rem;
         padding: 1rem;
-        background: #f9fafb;
+        background: #1a1a2e;
         border-radius: 8px;
         cursor: pointer;
         transition: all 0.2s;
     }
 
     .file-item:hover {
-        background: #e5e7eb;
+        background: #16213e;
     }
 
     .file-icon {
@@ -1668,17 +1724,17 @@
 
     .file-name {
         font-weight: 600;
-        color: #333;
+        color: #e0e0e0;
     }
 
     .file-meta {
         font-size: 0.875rem;
-        color: #666;
+        color: #999;
     }
 
     /* Feedback */
     .feedback-summary {
-        background: #f9fafb;
+        background: #1a1a2e;
         padding: 1rem;
         border-radius: 8px;
         margin-bottom: 1rem;
@@ -1686,7 +1742,7 @@
 
     .rating-display {
         font-size: 1.125rem;
-        color: #333;
+        color: #e0e0e0;
     }
 
     .feedback-list {
@@ -1696,9 +1752,19 @@
     }
 
     .feedback-item {
-        border: 2px solid #e0e0e0;
+        border: 2px solid #444;
+        background: #1a1a2e;
         border-radius: 8px;
         padding: 1rem;
+        color: #ccc;
+    }
+
+    .feedback-item p {
+        color: #b0b0b0;
+    }
+
+    .feedback-item small {
+        color: #999;
     }
 
     .feedback-rating {
@@ -1747,18 +1813,20 @@
     .btn-workflow {
         padding: 0.5rem 1rem;
         font-size: 0.875rem;
-        background: #f3f4f6;
-        color: #333;
+        background: #1a1a2e;
+        color: #ccc;
         text-transform: capitalize;
+        border: 1px solid #444;
     }
 
     .btn-workflow:hover {
-        background: #e5e7eb;
+        background: #16213e;
     }
 
     .btn-workflow.active {
         background: #667eea;
         color: white;
+        border-color: #667eea;
     }
 
     /* History */
@@ -1768,18 +1836,23 @@
     }
 
     .history-item {
-        background: #f9fafb;
+        background: #1a1a2e;
         padding: 1rem;
         border-radius: 8px;
         font-size: 0.875rem;
+        color: #ccc;
     }
 
     .history-item code {
-        background: white;
+        background: #0f0f1e;
         padding: 0.25rem 0.5rem;
         border-radius: 4px;
         font-family: monospace;
         color: #667eea;
+    }
+
+    .history-item small {
+        color: #999;
     }
 
     /* Utility */
@@ -1794,5 +1867,9 @@
 
     .upload-area {
         margin-bottom: 1rem;
+    }
+
+    .upload-area input[type="file"] {
+        color: #ccc;
     }
 </style>
