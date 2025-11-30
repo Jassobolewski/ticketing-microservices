@@ -13,6 +13,14 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  s3-registry:
+    build: ../s3-registry
+    container_name: s3-registry
+    environment:
+      PORT: 3003
+    ports:
+      - "3003:3003"
+
   s1-auth-account:
     build: ../s1-auth-account
     container_name: s1-auth-account
@@ -20,8 +28,10 @@ services:
       DB_URL: postgres://ticketuser:ticketpass@postgres:5432/ticketdb
       JWT_SECRET: super-secret-change-me
       PORT: 3001
+      REGISTRY_URL: http://s3-registry:3003
     depends_on:
       - postgres
+      - s3-registry
 
   s2-ticket-intake:
     build: ../s2-ticket-intake
@@ -30,8 +40,10 @@ services:
       DB_URL: postgres://ticketuser:ticketpass@postgres:5432/ticketdb
       JWT_SECRET: super-secret-change-me
       PORT: 3002
+      REGISTRY_URL: http://s3-registry:3003
     depends_on:
       - postgres
+      - s3-registry
       - s1-auth-account
 
   s4-workflow:
@@ -41,17 +53,22 @@ services:
       DB_URL: postgres://ticketuser:ticketpass@postgres:5432/ticketdb
       JWT_SECRET: super-secret-change-me
       PORT: 3004
+      REGISTRY_URL: http://s3-registry:3003
     depends_on:
       - postgres
+      - s3-registry
       - s1-auth-account
       - s2-ticket-intake
 
   api-gateway:
     build: ../api-gateway
     container_name: api-gateway
+    environment:
+      REGISTRY_URL: http://s3-registry:3003
     ports:
       - "8080:8080"
     depends_on:
+      - s3-registry
       - s1-auth-account
       - s2-ticket-intake
       - s4-workflow

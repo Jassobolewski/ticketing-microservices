@@ -1,0 +1,16 @@
+{
+  "name": "s3-registry",
+  "version": "1.0.0",
+  "description": "Service registry and discovery for microservices",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": ["registry", "service-discovery", "microservices"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.1.0",
+    "axios": "^1.6.0"
+  }
+}

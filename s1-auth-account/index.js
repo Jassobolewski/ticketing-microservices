@@ -89,11 +89,20 @@ app.get("/me", async (req, res) => {
   }
 });
 
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", service: "s1-auth" });
+});
+
 const PORT = process.env.PORT || 3001;
+const registerService = require('./register-helper');
 
 init().then(() => {
-  app.listen(PORT, () => {
+  app.listen(PORT, async () => {
     console.log(`Auth service running on port ${PORT}`);
+
+    // Register with service registry
+    await registerService('s1-auth', 's1-auth-account', PORT, '/health');
   });
 });
 
