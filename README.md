@@ -17,14 +17,44 @@ A production-ready microservices-based ticketing system built with Node.js, Expr
 ## Architecture Overview
 
 ```
-Client (Browser) → http://localhost:5173 (Svelte UI)
-                        ↓
-                  API Gateway (:8080)
-                        ↓
-        ┌───────────────┼───────────────┐
-        ↓               ↓               ↓
-   S1: Auth       S2: Tickets      PostgreSQL
-   (:3001)         (:3002)          (:5432)
+┌─────────────────────────────────────────────────────────────────────┐
+│                        Client (Browser)                             │
+└──────────────────────────────────┬──────────────────────────────────┘
+                                   │ HTTP
+                                   ↓
+                    ┌──────────────────────────────┐
+                    │     Web Client (Svelte)      │
+                    │    Port: 5173 (Vite Dev)     │
+                    │    Framework: Svelte 5.x     │
+                    └──────────────┬───────────────┘
+                                   │ HTTP Requests
+                                   ↓
+                    ┌──────────────────────────────┐
+                    │       API Gateway            │
+                    │    Port: 8080 (Public)       │
+                    │    Routes: /auth, /tickets   │
+                    │    CORS, Health Check        │
+                    └──────────┬───────────────────┘
+                               │
+                ┌──────────────┼──────────────┐
+                │              │              │
+                ↓              ↓              ↓
+    ┌───────────────────┐ ┌──────────────┐ ┌─────────────────┐
+    │   S1: Auth        │ │ S2: Tickets  │ │   PostgreSQL    │
+    │   Port: 3001      │ │ Port: 3002   │ │   Port: 5432    │
+    │                   │ │              │ │                 │
+    │   /register       │ │ POST /       │ │   Database:     │
+    │   /login          │ │ GET /        │ │   ticketdb      │
+    │   /me             │ │ GET /:id     │ │                 │
+    │                   │ │              │ │   Tables:       │
+    │   JWT Auth        │ │ JWT Verify   │ │   - users       │
+    │   bcrypt Hash     │ │              │ │   - tickets     │
+    └─────────┬─────────┘ └──────┬───────┘ └─────────────────┘
+              │                  │               ▲
+              │                  │               │
+              └──────────────────┴───────────────┘
+                         DB Connection
+                    postgres://ticketuser:***@postgres:5432/ticketdb
 ```
 
 ### Services
