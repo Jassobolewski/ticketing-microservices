@@ -17,23 +17,124 @@ A production-ready microservices-based ticketing system built with Node.js, Expr
 ## Architecture Overview
 
 ```
-Client (Browser) → http://localhost:5173 (Svelte UI)
-                        ↓
-                  API Gateway (:8080)
-                        ↓
-        ┌───────────────┼───────────────┐
-        ↓               ↓               ↓
-   S1: Auth       S2: Tickets      PostgreSQL
-   (:3001)         (:3002)          (:5432)
+┌────────────────────────────────────────────────────────────────────────────┐
+│                          Client (Browser)                                  │
+└────────────────────────────────┬───────────────────────────────────────────┘
+                                 │ HTTP
+                                 ↓
+                  ┌──────────────────────────────────┐
+                  │      Web Client (Svelte)         │
+                  │       Port: 5173 (Vite)          │
+                  │     Framework: Svelte 5.x        │
+                  └──────────────┬───────────────────┘
+                                 │ HTTP Requests
+                                 ↓
+                  ┌──────────────────────────────────┐
+                  │         API Gateway              │
+                  │        Port: 8080 (Public)       │
+                  │  CORS, Routing, Health Check     │
+                  └────────────┬─────────────────────┘
+                               │
+        ┌──────────────────────┼──────────────────────────────────────┐
+        │                      │                                      │
+        ↓                      ↓                                      ↓
+┌───────────────┐   ┌──────────────────┐                  ┌──────────────────┐
+│  S1: Auth     │   │  S2: Tickets     │                  │ S3: Registry     │
+│  Port: 3001   │   │  Port: 3002      │                  │ Port: 3003       │
+│               │   │                  │                  │                  │
+│ /register     │   │ POST /           │                  │ Service          │
+│ /login        │   │ GET /            │◄─────register────│ Discovery        │
+│ /me           │   │ GET /:id         │                  │ Health Monitor   │
+│               │   │                  │                  │                  │
+│ JWT + bcrypt  │   │ JWT Verify       │                  │ /register        │
+└───────┬───────┘   └────────┬─────────┘                  │ /discover/:name  │
+        │                    │                            │ /services        │
+        │                    │                            └─────────┬────────┘
+        │                    │                                      │
+        │                    │                            ┌─────────▼────────┐
+        │                    │                            │ S4: Workflow     │
+        │                    │                            │ Port: 3004       │
+        │                    │                            │                  │
+        │                    │                            │ PATCH /status/:id│
+        │                    │                            │ PATCH /priority  │
+        │                    │                            │ PATCH /assign    │
+        │                    │                            │ GET /history     │
+        │                    │                            │ GET /queue       │
+        │                    │                            └─────┬────────────┘
+        │                    │                                  │
+        │                    │                            sends notifications
+        │                    │                                  │
+        │            ┌───────┴────────┐                         ↓
+        │            │                │              ┌──────────────────────┐
+        │            ↓                ↓              │ S6: Notifications    │
+        │    ┌───────────────┐ ┌──────────────┐     │ Port: 3006           │
+        │    │ S5: Media     │ │ S8: Feedback │     │                      │
+        │    │ Port: 3005    │ │ Port: 3008   │     │ POST /notify         │
+        │    │               │ │              │     │ GET /history/:userId │
+        │    │ POST /upload  │ │ POST /       │     │ GET /queue           │
+        │    │ GET /ticket/  │ │ GET /ticket/ │     │                      │
+        │    │ GET /:id      │ │ GET /user/   │     │ Channels:            │
+        │    │ DELETE /:id   │ │ GET /stats   │────►│ - Email (simulated)  │
+        │    │               │ │ DELETE /:id  │     │ - SMS (simulated)    │
+        │    │ File Storage  │ │              │     │ - In-app             │
+        │    │ Multer Upload │ │ Ratings 1-5  │     └──────────────────────┘
+        │    └───────┬───────┘ └──────┬───────┘
+        │            │                │
+        │            │                │ notifies
+        │            │                │
+        │            │                ↓
+        │            │      ┌──────────────────────┐
+        │            │      │ S7: Analytics        │
+        │            │      │ Port: 3007           │
+        │            │      │                      │
+        │            │      │ GET /metrics         │
+        │            │      │ GET /dashboard       │
+        │            │      │ POST /refresh        │
+        │            │      │ GET /tickets/stats   │
+        │            │      │ GET /feedback/stats  │
+        │            │      │                      │
+        │            │      │ Metrics Cache (1min) │
+        │            │      └──────────┬───────────┘
+        │            │                 │
+        │            │                 │
+        ↓            ↓                 ↓
+┌────────────────────────────────────────────────────────────┐
+│                     PostgreSQL Database                    │
+│                      Port: 5432                            │
+│                   Database: ticketdb                       │
+│                                                            │
+│  Tables:                                                   │
+│  • users (S1)                                              │
+│  • tickets (S2)                                            │
+│  • ticket_history (S4)                                     │
+│  • media_files (S5)                                        │
+│  • notifications (S6)                                      │
+│  • feedback (S8)                                           │
+│                                                            │
+│  Connection: postgres://ticketuser:***@postgres:5432/ticketdb │
+└────────────────────────────────────────────────────────────┘
+
+Service Communication:
+━━━━━━━━━━━━━━━━━━━━
+• S4 → S6: Sends notifications when ticket status changes
+• S8 → S7: Notifies analytics to refresh cache on feedback changes
+• S3: All services register themselves for discovery
+• All services → PostgreSQL: Shared database with logical table separation
 ```
 
 ### Services
 
+- **Web Client** (Port 5173) - Svelte-based user interface with Vite dev server
 - **API Gateway** (Port 8080) - Routes requests, handles CORS, provides unified entry point
 - **S1: Auth Service** (Port 3001) - User registration, login, JWT token management
 - **S2: Ticket Service** (Port 3002) - Ticket creation, listing, and retrieval
-- **PostgreSQL** (Port 5432) - Database for users and tickets
-- **Web Client** (Port 5173) - Svelte-based user interface
+- **S3: Registry Service** (Port 3003) - Service discovery, registration, and health monitoring
+- **S4: Workflow Service** (Port 3004) - Ticket status management, priority, assignment, history tracking
+- **S5: Media Service** (Port 3005) - File upload/download for ticket attachments
+- **S6: Notifications Service** (Port 3006) - Email, SMS, and in-app notifications
+- **S7: Analytics Service** (Port 3007) - Metrics aggregation, dashboards, reporting
+- **S8: Feedback Service** (Port 3008) - User feedback and ratings for tickets
+- **PostgreSQL** (Port 5432) - Shared database with logical table separation
 
 ---
 
@@ -46,13 +147,43 @@ ticketing-microservices/
 │   ├── package.json
 │   └── Dockerfile
 │
-├── s1-auth-account/          # Authentication service
+├── s1-auth-account/          # S1: Authentication service
 │   ├── index.js              # /register, /login, /me endpoints
 │   ├── package.json
 │   └── Dockerfile
 │
-├── s2-ticket-intake/         # Ticket management service
+├── s2-ticket-intake/         # S2: Ticket management service
 │   ├── index.js              # Ticket CRUD operations
+│   ├── package.json
+│   └── Dockerfile
+│
+├── s3-registry/              # S3: Service discovery & registry
+│   ├── index.js              # Service registration, health checks
+│   ├── package.json
+│   └── Dockerfile
+│
+├── s4-workflow/              # S4: Workflow & ticket lifecycle
+│   ├── index.js              # Status, priority, assignment
+│   ├── package.json
+│   └── Dockerfile
+│
+├── s5-media/                 # S5: Media & file uploads
+│   ├── index.js              # File upload, download, storage
+│   ├── package.json
+│   └── Dockerfile
+│
+├── s6-notifications/         # S6: Notification service
+│   ├── index.js              # Email, SMS, in-app notifications
+│   ├── package.json
+│   └── Dockerfile
+│
+├── s7-analytics/             # S7: Analytics & reporting
+│   ├── index.js              # Metrics, dashboard, statistics
+│   ├── package.json
+│   └── Dockerfile
+│
+├── s8-feedback/              # S8: User feedback & ratings
+│   ├── index.js              # Ticket ratings and comments
 │   ├── package.json
 │   └── Dockerfile
 │
@@ -281,7 +412,9 @@ Valid ticket categories:
 
 ## Database Schema
 
-### Users Table
+All services share a single PostgreSQL database (`ticketdb`) with logically separated tables.
+
+### Users Table (S1: Auth)
 
 ```sql
 CREATE TABLE users (
@@ -292,7 +425,7 @@ CREATE TABLE users (
 );
 ```
 
-### Tickets Table
+### Tickets Table (S2: Ticket Intake)
 
 ```sql
 CREATE TABLE tickets (
@@ -302,9 +435,74 @@ CREATE TABLE tickets (
   description TEXT NOT NULL,
   category TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'new',
+  priority TEXT NOT NULL DEFAULT 'medium',  -- Added by S4
+  assigned_to INTEGER,                       -- Added by S4
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(), -- Added by S4
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 ```
+
+### Ticket History Table (S4: Workflow)
+
+```sql
+CREATE TABLE ticket_history (
+  id SERIAL PRIMARY KEY,
+  ticket_id INTEGER NOT NULL,
+  changed_by INTEGER NOT NULL,
+  field_name TEXT NOT NULL,
+  old_value TEXT,
+  new_value TEXT,
+  changed_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+```
+
+### Media Files Table (S5: Media)
+
+```sql
+CREATE TABLE media_files (
+  id SERIAL PRIMARY KEY,
+  ticket_id INTEGER NOT NULL,
+  filename TEXT NOT NULL,
+  original_filename TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  file_size INTEGER NOT NULL,
+  uploaded_by INTEGER NOT NULL,
+  uploaded_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+```
+
+### Notifications Table (S6: Notifications)
+
+```sql
+CREATE TABLE notifications (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  ticket_id INTEGER,
+  type TEXT NOT NULL,
+  channel TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  message TEXT NOT NULL,
+  retry_count INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  sent_at TIMESTAMP
+);
+```
+
+### Feedback Table (S8: Feedback)
+
+```sql
+CREATE TABLE feedback (
+  id SERIAL PRIMARY KEY,
+  ticket_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  comment TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE(ticket_id, user_id)
+);
+```
+
+**Note:** S3 (Registry) uses in-memory storage, and S7 (Analytics) reads from existing tables without creating its own.
 
 ---
 
