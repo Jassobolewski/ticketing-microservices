@@ -199,7 +199,6 @@ ticketing-microservices/
 ├── infra/
 │   └── docker-compose.yml    # Container orchestration
 │
-├── CLAUDE.md                 # AI assistant guide
 └── README.md                 # This file
 ```
 
@@ -729,8 +728,6 @@ Run it: `./test-api.sh`
 
 ## Production Deployment
 
-**This is a development setup.** Before deploying to production:
-
 ### Security
 - [ ] Change `JWT_SECRET` to a strong random value
 - [ ] Use HTTPS/TLS for all services
@@ -791,7 +788,6 @@ This project is provided as-is for educational and demonstration purposes.
 
 ## Support
 
-- **Documentation:** See [CLAUDE.md](./CLAUDE.md) for detailed architecture guide
 - **Issues:** Report bugs or request features via GitHub issues
 - **Questions:** Check the troubleshooting section above
 
@@ -820,5 +816,3 @@ curl http://localhost:8080/health
 ```
 
 ---
-
-**Built with modern microservices architecture principles for scalability, maintainability, and cloud portability.**
