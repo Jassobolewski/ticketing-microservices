@@ -566,7 +566,7 @@ Services use these environment variables (configured in `docker-compose.yml`):
 
 **Default Values (Development):**
 - Database: `postgres://ticketuser:ticketpass@postgres:5432/ticketdb`
-- JWT Secret: `dev-secret` ⚠️ **Change in production!**
+- JWT Secret: `dev-secret`
 
 ### Ports
 
@@ -729,7 +729,7 @@ Run it: `./test-api.sh`
 
 ## Production Deployment
 
-⚠️ **This is a development setup.** Before deploying to production:
+**This is a development setup.** Before deploying to production:
 
 ### Security
 - [ ] Change `JWT_SECRET` to a strong random value
