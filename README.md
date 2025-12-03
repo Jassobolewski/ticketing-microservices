@@ -726,39 +726,6 @@ Run it: `./test-api.sh`
 
 ---
 
-## Production Deployment
-
-### Security
-- [ ] Change `JWT_SECRET` to a strong random value
-- [ ] Use HTTPS/TLS for all services
-- [ ] Update CORS to allow only your production domain
-- [ ] Use strong database credentials
-- [ ] Enable PostgreSQL SSL connections
-- [ ] Add rate limiting to prevent abuse
-- [ ] Implement input validation and sanitization
-
-### Infrastructure
-- [ ] Use proper container orchestration (Kubernetes, ECS, etc.)
-- [ ] Set up database backups
-- [ ] Configure health checks and auto-restart
-- [ ] Add centralized logging (ELK, CloudWatch)
-- [ ] Set up monitoring and alerting
-- [ ] Use environment variables or secrets management
-
-### Database
-- [ ] Replace `CREATE TABLE IF NOT EXISTS` with proper migrations
-- [ ] Add foreign key constraints
-- [ ] Add database indexes for performance
-- [ ] Configure connection pooling
-
-### Code Quality
-- [ ] Add comprehensive tests
-- [ ] Set up CI/CD pipeline
-- [ ] Add API documentation (Swagger/OpenAPI)
-- [ ] Enable linting and code formatting
-
----
-
 ## Technology Stack
 
 - **Backend:** Node.js 20, Express 5.x
